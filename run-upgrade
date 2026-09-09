@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+
+## Description: Launch an interactive Claude Code session pre-loaded with the /d11-upgrade run skill
+## Usage: run-upgrade
+## Example: "ddev run-upgrade"
+
+set -uo pipefail
+
+PROJECT_ROOT="${DDEV_APPROOT:-$(pwd)}"
+cd "$PROJECT_ROOT" || exit 1
+
+if ! command -v claude >/dev/null 2>&1; then
+  echo "claude CLI not found on PATH. Install Claude Code first, then re-run 'ddev run-upgrade'." >&2
+  exit 1
+fi
+
+exec claude "/d11-upgrade run"
