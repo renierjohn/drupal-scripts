@@ -14,7 +14,7 @@ Portable ddev + Claude Code toolkit for auditing and executing a Drupal 10 → 1
 | `run-upgrade` | `.ddev/commands/host/run-upgrade` | `ddev run-upgrade` - opens an interactive Claude Code session that runs `/d11-upgrade run` |
 | `post-upgrade` | `.ddev/commands/host/post-upgrade` | `ddev post-upgrade` - visits the homepage + main-menu pages and admin pages, checks dblog for new errors, saves the report |
 | `post-upgrade-menu-links.php` | `.ddev/commands/host/post-upgrade-menu-links.php` | Helper invoked by `post-upgrade` (enumerates the 'main' menu's internal links via Drupal's menu API) |
-| `post-upgrade-watchdog.php` | `.ddev/commands/host/post-upgrade-watchdog.php` | Helper invoked by `post-upgrade` (reads new dblog Error/Critical/Emergency entries since a given timestamp) |
+| `post-upgrade-watchdog.php` | `.ddev/commands/host/post-upgrade-watchdog.php` | Helper invoked by `post-upgrade` (reads new dblog Emergency/Critical/Error/Warning entries since a given timestamp) |
 
 Skills live one-per-subdirectory (`d11-upgrade/SKILL.md`, matching `.claude/skills/<name>/SKILL.md`), so additional skills can be added later as sibling directories (e.g. `another-skill/SKILL.md`) without colliding.
 
@@ -47,7 +47,7 @@ Skills live one-per-subdirectory (`d11-upgrade/SKILL.md`, matching `.claude/skil
    ```bash
    ddev post-upgrade
    ```
-   Visits the homepage plus every enabled link in the site's `main` menu (anonymously), then generates a `drush uli` login and visits a set of core admin pages (`/admin`, `/admin/content`, `/admin/structure`, `/admin/config`, `/admin/people`, `/admin/appearance`, `/admin/modules`, `/admin/reports/status`) using that authenticated session. After each phase it checks the dblog for any new Emergency/Critical/Error entries logged during that phase specifically (not the site's full log history) and writes everything to `post-upgrade.md`.
+   Visits the homepage plus every enabled link in the site's `main` menu (anonymously), then generates a `drush uli` login and visits a set of core admin pages (`/admin`, `/admin/content`, `/admin/structure`, `/admin/config`, `/admin/people`, `/admin/appearance`, `/admin/modules`, `/admin/reports/status`) using that authenticated session. After each phase it checks the dblog for any new Emergency/Critical/Error/Warning entries logged during that phase specifically (not the site's full log history) and writes everything to `post-upgrade.md`.
 
 ## Notes
 

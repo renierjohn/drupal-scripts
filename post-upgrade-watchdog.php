@@ -2,8 +2,9 @@
 /**
  * Helper for the `ddev post-upgrade` command.
  * Prints a markdown table of dblog (watchdog) entries with severity
- * Emergency(0), Critical(2), or Error(3) logged at or after the given unix
- * timestamp. Reads the DB directly via PDO - no Drupal bootstrap required.
+ * Emergency(0), Critical(2), Error(3), or Warning(4) logged at or after the
+ * given unix timestamp. Reads the DB directly via PDO - no Drupal bootstrap
+ * required.
  *
  * Usage: php post-upgrade-watchdog.php <start_unix_timestamp>
  */
@@ -23,7 +24,7 @@ catch (\Throwable $e) {
 $stmt = $pdo->prepare(
   "SELECT wid, type, severity, timestamp, message, variables, location
    FROM watchdog
-   WHERE severity IN (0, 2, 3) AND timestamp >= :ts
+   WHERE severity IN (0, 2, 3, 4) AND timestamp >= :ts
    ORDER BY timestamp ASC"
 );
 $stmt->execute([':ts' => $startTs]);
@@ -34,7 +35,7 @@ if (!$rows) {
   exit(0);
 }
 
-$severityLabels = [0 => 'Emergency', 2 => 'Critical', 3 => 'Error'];
+$severityLabels = [0 => 'Emergency', 2 => 'Critical', 3 => 'Error', 4 => 'Warning'];
 
 echo "| Severity | Type | Timestamp | Message | Location |\n";
 echo "|---|---|---|---|---|\n";

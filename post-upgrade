@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-## Description: Post-upgrade smoke test - visits homepage + main-menu pages and admin pages, checks dblog for new error/critical/emergency entries, saves to reports/post-upgrade.md
+## Description: Post-upgrade smoke test - visits homepage + main-menu pages and admin pages, checks dblog for new emergency/critical/error/warning entries, saves to reports/post-upgrade.md
 ## Usage: post-upgrade
 ## Example: "ddev post-upgrade"
 
@@ -123,7 +123,7 @@ log "Writing report to .ddev/commands/host/reports/post-upgrade.md"
   echo
   render_visit_table "${PHASE1_RESULTS[@]}"
   echo
-  echo "### dblog findings - Error / Critical / Emergency (during this phase)"
+  echo "### dblog findings - Emergency / Critical / Error / Warning (during this phase)"
   echo
   echo "$PHASE1_WATCHDOG"
   echo
@@ -133,7 +133,7 @@ log "Writing report to .ddev/commands/host/reports/post-upgrade.md"
   echo
   render_visit_table "${PHASE2_RESULTS[@]}"
   echo
-  echo "### dblog findings - Error / Critical / Emergency (during this phase)"
+  echo "### dblog findings - Emergency / Critical / Error / Warning (during this phase)"
   echo
   echo "$PHASE2_WATCHDOG"
   echo
