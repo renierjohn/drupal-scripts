@@ -12,6 +12,9 @@ Portable ddev + Claude Code toolkit for auditing and executing a Drupal 10 → 1
 | `pre-upgrade-scan.php` | `.ddev/commands/host/pre-upgrade-scan.php` | Helper invoked by `pre-upgrade` (module classification, custom code, removed-core-module scan) |
 | `ckeditor5-checklist-scan.php` | `.ddev/commands/host/ckeditor5-checklist-scan.php` | Helper invoked by `pre-upgrade` (CKEditor 4→5 detection + plugin compatibility) |
 | `run-upgrade` | `.ddev/commands/host/run-upgrade` | `ddev run-upgrade` - opens an interactive Claude Code session that runs `/d11-upgrade run` |
+| `post-upgrade` | `.ddev/commands/host/post-upgrade` | `ddev post-upgrade` - visits the homepage + main-menu pages and admin pages, checks dblog for new errors, saves the report |
+| `post-upgrade-menu-links.php` | `.ddev/commands/host/post-upgrade-menu-links.php` | Helper invoked by `post-upgrade` (enumerates the 'main' menu's internal links via Drupal's menu API) |
+| `post-upgrade-watchdog.php` | `.ddev/commands/host/post-upgrade-watchdog.php` | Helper invoked by `post-upgrade` (reads new dblog Error/Critical/Emergency entries since a given timestamp) |
 
 Skills live one-per-subdirectory (`d11-upgrade/SKILL.md`, matching `.claude/skills/<name>/SKILL.md`), so additional skills can be added later as sibling directories (e.g. `another-skill/SKILL.md`) without colliding.
 
@@ -40,9 +43,15 @@ Skills live one-per-subdirectory (`d11-upgrade/SKILL.md`, matching `.claude/skil
    - **Guided (recommended):** `ddev run-upgrade` - opens an interactive Claude Code session pre-loaded with `/d11-upgrade run`. You approve each tool call as it runs; nothing executes unattended.
    - **Manual:** open `.claude/skills/d11-upgrade/SKILL.md` and work through its phases yourself, using the two reports as the source of truth for what needs upgrading.
 5. Re-run `ddev pre-upgrade` after major changes (composer updates, patches, module removals) to confirm the reports reflect the current state before continuing.
+6. Smoke-test the upgraded site:
+   ```bash
+   ddev post-upgrade
+   ```
+   Visits the homepage plus every enabled link in the site's `main` menu (anonymously), then generates a `drush uli` login and visits a set of core admin pages (`/admin`, `/admin/content`, `/admin/structure`, `/admin/config`, `/admin/people`, `/admin/appearance`, `/admin/modules`, `/admin/reports/status`) using that authenticated session. After each phase it checks the dblog for any new Emergency/Critical/Error entries logged during that phase specifically (not the site's full log history) and writes everything to `post-upgrade.md`.
 
 ## Notes
 
 - `pre-upgrade` performs *real* `composer require`/`composer update` calls (for Drush, `upgrade_status`, and `drupal-check` if missing) - it changes `composer.json`/`composer.lock`, not just reads them. Review `git diff` after running it.
 - The `upgrade_status`/`drupal-check` deprecation scans require a working Drupal bootstrap. A PHP fatal anywhere in enabled module/theme code (most commonly a duplicate function declaration across two themes) will make every scanned item fail identically - `pre-upgrade.md` detects and calls this out explicitly rather than reporting misleading per-module results.
 - The Drupal-11-removed core module/theme list checked by `pre-upgrade` is fixed (`ckeditor`, `color`, `classy`, `stable`, `aggregator`, `book`, `forum`, `hal`, `quickedit`, `rdf`, `statistics`, `tour`) - it will not detect a future core removal not on this list.
+- `post-upgrade` also needs a working Drupal bootstrap (to enumerate the `main` menu via `drush php:script`) and the same default `db`/`db`/`db`@`db:3306` database access as `pre-upgrade` (to read dblog directly via PDO). A 200 HTTP status on a visited page does not mean nothing went wrong - always check the dblog table in the report too, since Drupal can log an error while still rendering a 200 response.

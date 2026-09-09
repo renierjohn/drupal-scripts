@@ -11,6 +11,9 @@
 #   drupal-scripts/pre-upgrade-scan.php            -> .ddev/commands/host/pre-upgrade-scan.php
 #   drupal-scripts/ckeditor5-checklist-scan.php    -> .ddev/commands/host/ckeditor5-checklist-scan.php
 #   drupal-scripts/run-upgrade                     -> .ddev/commands/host/run-upgrade
+#   drupal-scripts/post-upgrade                    -> .ddev/commands/host/post-upgrade
+#   drupal-scripts/post-upgrade-menu-links.php      -> .ddev/commands/host/post-upgrade-menu-links.php
+#   drupal-scripts/post-upgrade-watchdog.php        -> .ddev/commands/host/post-upgrade-watchdog.php
 #
 # This script lives INSIDE drupal-scripts/ - run it from the project root as
 # ./drupal-scripts/setup-drupal-upgrade.sh (or from anywhere; it resolves its
@@ -51,7 +54,10 @@ install_file "$SOURCE_DIR/pre-upgrade" "$DDEV_HOST_DIR/pre-upgrade" "exec"
 install_file "$SOURCE_DIR/pre-upgrade-scan.php" "$DDEV_HOST_DIR/pre-upgrade-scan.php" "exec"
 install_file "$SOURCE_DIR/ckeditor5-checklist-scan.php" "$DDEV_HOST_DIR/ckeditor5-checklist-scan.php" "exec"
 install_file "$SOURCE_DIR/run-upgrade" "$DDEV_HOST_DIR/run-upgrade" "exec"
+install_file "$SOURCE_DIR/post-upgrade" "$DDEV_HOST_DIR/post-upgrade" "exec"
+install_file "$SOURCE_DIR/post-upgrade-menu-links.php" "$DDEV_HOST_DIR/post-upgrade-menu-links.php" "exec"
+install_file "$SOURCE_DIR/post-upgrade-watchdog.php" "$DDEV_HOST_DIR/post-upgrade-watchdog.php" "exec"
 
-log "Done. Run 'ddev pre-upgrade' to generate the audit reports, then 'ddev run-upgrade' to start the upgrade."
+log "Done. Run 'ddev pre-upgrade' to generate the audit reports, 'ddev run-upgrade' to start the upgrade, then 'ddev post-upgrade' to smoke-test the site afterward."
 
 ddev start
