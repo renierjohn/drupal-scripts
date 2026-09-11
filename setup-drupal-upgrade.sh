@@ -115,6 +115,38 @@ check_yarn() {
   fi
 }
 
+prompt_site_domain() {
+  local env_file="$DDEV_HOST_DIR/.env"
+  local default_domain="" input tmp
+
+  if [ -f "$env_file" ]; then
+    default_domain="$(grep -E '^BASE_URL=' "$env_file" | tail -1 | cut -d= -f2-)"
+  fi
+
+  local msg="Site domain (e.g. example.com or https://example.ddev.site)"
+  [ -n "$default_domain" ] && msg="$msg [$default_domain]"
+
+  read -rp "$msg: " input || input=""
+  [ -z "$input" ] && input="$default_domain"
+  [ -n "$input" ] || fail "A site domain is required."
+
+  case "$input" in
+    http://*|https://*) : ;;
+    *) input="https://$input" ;;
+  esac
+  input="${input%/}"
+
+  mkdir -p "$DDEV_HOST_DIR"
+  if [ -f "$env_file" ] && grep -q '^BASE_URL=' "$env_file"; then
+    tmp="$(mktemp)"
+    awk -v val="BASE_URL=$input" '{ if ($0 ~ /^BASE_URL=/) print val; else print }' "$env_file" > "$tmp"
+    mv "$tmp" "$env_file"
+  else
+    printf 'BASE_URL=%s\n' "$input" >> "$env_file"
+  fi
+  log "Saved BASE_URL=$input -> ${env_file#"$PROJECT_ROOT"/}"
+}
+
 log "Installing D10->D11 upgrade toolkit from drupal-scripts/ ..."
 
 install_file "$SOURCE_DIR/d11-upgrade/SKILL.md" "$SKILL_DIR/SKILL.md" "plain"
@@ -142,6 +174,8 @@ check_yarn
 log "Installing nodejs toolkit dependencies (yarn install in .ddev/commands/host/nodejs) ..."
 ( cd "$DDEV_HOST_DIR/nodejs" && yarn install ) || fail "yarn install failed in ${DDEV_HOST_DIR#"$PROJECT_ROOT"/}/nodejs"
 log "nodejs toolkit dependencies installed."
+
+prompt_site_domain
 
 log "Done. Run 'ddev pre-upgrade' to generate the audit reports, 'ddev run-upgrade' to start the upgrade, then 'ddev post-upgrade' to smoke-test the site afterward."
 
