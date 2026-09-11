@@ -28,7 +28,7 @@ Skills live one-per-subdirectory (`d11-upgrade/SKILL.md`, matching `.claude/skil
 - A **Drupal 10** codebase managed with **Composer**, using **Drush** (installed or installable via Composer).
 - The project's **default database service must be named `db`**, reachable at `db:3306` from the web container, with the standard ddev local credentials (`db`/`db`/`db`). `pre-upgrade` and `ckeditor5-checklist-scan.php` connect directly via PDO using these defaults to read active config even when Drush itself can't fully bootstrap. If a project uses different DB credentials or a non-default service name, that direct read fails and both scripts fall back to reading `config/default/*.yml` instead - still works, but reflects the *exported* config rather than the *active* one, so DB/code drift (e.g. an enabled module with no matching code on disk) won't be caught.
 - **Claude Code CLI** (`claude`) installed and authenticated on the host, only if you intend to use `ddev run-upgrade`. `ddev pre-upgrade` on its own has no Claude Code dependency.
-- Enough disk/network for Composer to actually install `drush/drush`, `drupal/upgrade_status`, and `mglaman/drupal-check` if they aren't already present - `pre-upgrade` installs them automatically on first run.
+- Enough disk/network for Composer to actually install `drush/drush`, `drupal/upgrade_status`, `mglaman/drupal-check`, and `drupal/stage_file_proxy` if they aren't already present - `pre-upgrade` installs them automatically on first run.
 
 ## Usage
 
@@ -42,7 +42,7 @@ Skills live one-per-subdirectory (`d11-upgrade/SKILL.md`, matching `.claude/skil
    ```bash
    ddev pre-upgrade
    ```
-   Writes `pre-upgrade.md` and `ckeditor5-checklist.md` (plus raw scanner output) to `.ddev/commands/host/reports/`. Read `pre-upgrade.md` first - it flags any CRITICAL blocker (e.g. a module enabled in the DB with no code on disk) that will break later steps if left unresolved.
+   Writes `pre-upgrade.md` and `ckeditor5-checklist.md` (plus raw scanner output) to `.ddev/commands/host/reports/`. Read `pre-upgrade.md` first - it flags any CRITICAL blocker (e.g. a module enabled in the DB with no code on disk) that will break later steps if left unresolved. It also installs/enables `drupal/stage_file_proxy` and points its origin at the `BASE_URL` saved in `.ddev/commands/host/.env` (see step 2 of setup) so local file requests fall back to the live site instead of 404ing.
    Optionally, capture a visual baseline before touching any code:
    ```bash
    ddev nodejs-scrape pre
