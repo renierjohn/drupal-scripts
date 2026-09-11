@@ -33,7 +33,10 @@
  *             check only those pages (written to output/<label>.json).
  *             A full "http(s)://" URL is also accepted in place of a path.
  * - BASE_URL: override the site base URL (default: auto-detected via
- *             `ddev describe -j`, falling back to https://prometweb.ddev.site)
+ *             `ddev describe -j`, falling back to https://prometweb.ddev.site).
+ *             Can be set in the environment, or in a ".env" file next to
+ *             this script (e.g. BASE_URL=https://example.com) -- values
+ *             already set in the environment take precedence over ".env".
  */
 
 'use strict';
@@ -44,6 +47,23 @@ const { execSync } = require('child_process');
 const { chromium } = require('playwright');
 
 const OUTPUT_DIR = path.join(__dirname, 'output');
+
+/** Minimal .env loader (no dependency): KEY=VALUE per line, existing env vars win. */
+function loadDotEnv(file = path.join(__dirname, '.env')) {
+  if (!fs.existsSync(file)) return;
+  for (const line of fs.readFileSync(file, 'utf8').split('\n')) {
+    const match = line.match(/^\s*([\w.-]+)\s*=\s*(.*)?\s*$/);
+    if (!match) continue;
+    const key = match[1];
+    let value = (match[2] || '').trim();
+    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+      value = value.slice(1, -1);
+    }
+    if (!(key in process.env)) process.env[key] = value;
+  }
+}
+
+loadDotEnv();
 
 const REGION_SELECTORS = {
   header: ['header[role="banner"]', 'header', '#header', '.region-header', '.site-header'],
