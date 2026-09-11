@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-## Description: Post-upgrade smoke test - visits homepage + main-menu pages and admin pages, checks dblog for new emergency/critical/error/warning entries, saves to reports/post-upgrade.md
+## Description: Post-upgrade smoke test - visits homepage + main-menu pages and admin pages, checks dblog for new emergency/critical/error/warning entries, captures a post-upgrade visual snapshot and diffs it against the pre-upgrade baseline, saves to reports/post-upgrade.md
 ## Usage: post-upgrade
 ## Example: "ddev post-upgrade"
 
@@ -12,6 +12,8 @@ cd "$PROJECT_ROOT" || exit 1
 REPORTS_DIR="$PROJECT_ROOT/.ddev/commands/host/reports"
 mkdir -p "$REPORTS_DIR"
 REPORT="$REPORTS_DIR/post-upgrade.md"
+RAW_NODEJS_SCRAPE="$REPORTS_DIR/post-upgrade-nodejs-scrape-raw.txt"
+RAW_NODEJS_DIFF="$REPORTS_DIR/post-upgrade-nodejs-diff-raw.txt"
 MENU_LINKS_PHP=".ddev/commands/host/post-upgrade-menu-links.php"
 ADMIN_PATHS_PHP=".ddev/commands/host/post-upgrade-admin-paths.php"
 WATCHDOG_PHP=".ddev/commands/host/post-upgrade-watchdog.php"
@@ -60,7 +62,7 @@ render_visit_table() {
 ########################################
 # Step 1: Homepage + main-menu pages
 ########################################
-log "Step 1/2: visiting homepage and main-menu pages"
+log "Step 1/3: visiting homepage and main-menu pages"
 
 MENU_LINKS_OUTPUT="$(ddev drush php:script "$MENU_LINKS_PHP" 2>&1)"
 MENU_PATHS="$(echo "$MENU_LINKS_OUTPUT" | grep '^/' || true)"
@@ -82,7 +84,7 @@ PHASE1_WATCHDOG="$(ddev exec php "$WATCHDOG_PHP" "$PHASE1_START" 2>&1)"
 ########################################
 # Step 2: Admin pages via drush uli
 ########################################
-log "Step 2/2: visiting admin pages via drush uli"
+log "Step 2/3: visiting admin pages via drush uli"
 
 ULI="$(ddev drush uli 2>&1 | tail -1)"
 LOGIN_CODE="$(curl -s -L -c "$COOKIEJAR" -b "$COOKIEJAR" -o /dev/null -w '%{http_code}' --max-time 15 "$ULI" 2>/dev/null)"
@@ -107,6 +109,46 @@ done
 
 log "Visited ${#PHASE2_RESULTS[@]} admin page(s). Checking dblog ..."
 PHASE2_WATCHDOG="$(ddev exec php "$WATCHDOG_PHP" "$PHASE2_START" 2>&1)"
+
+########################################
+# Step 3: capture post-upgrade visual snapshot + diff against pre-upgrade baseline
+########################################
+log "Step 3/3: capturing post-upgrade visual snapshot and diffing against pre-upgrade baseline"
+
+NODEJS_SCRAPE_CMD="$PROJECT_ROOT/.ddev/commands/host/nodejs-scrape"
+NODEJS_DIFF_CMD="$PROJECT_ROOT/.ddev/commands/host/nodejs-diff"
+NODEJS_SCRAPE_RAN=false
+NODEJS_SCRAPE_STATUS=""
+NODEJS_DIFF_RAN=false
+NODEJS_DIFF_STATUS=""
+
+if [ -x "$NODEJS_SCRAPE_CMD" ]; then
+  if ddev nodejs-scrape post 2>&1 | tee "$RAW_NODEJS_SCRAPE"; then
+    NODEJS_SCRAPE_RAN=true
+    NODEJS_SCRAPE_STATUS="Captured post-upgrade snapshot(s) to \`.ddev/commands/host/nodejs/output/post.*.json\`"
+  else
+    NODEJS_SCRAPE_STATUS="**FAILED** - see \`.ddev/commands/host/reports/post-upgrade-nodejs-scrape-raw.txt\`"
+    warn "ddev nodejs-scrape post failed - see .ddev/commands/host/reports/post-upgrade-nodejs-scrape-raw.txt"
+  fi
+else
+  NODEJS_SCRAPE_STATUS="**skipped** - \`.ddev/commands/host/nodejs-scrape\` not installed. Run \`./drupal-scripts/setup-drupal-upgrade.sh\` first, then re-run \`ddev post-upgrade\`."
+  warn "nodejs-scrape not installed - skipping visual snapshot/diff."
+fi
+
+if $NODEJS_SCRAPE_RAN && [ -x "$NODEJS_DIFF_CMD" ]; then
+  if ddev nodejs-diff 2>&1 | tee "$RAW_NODEJS_DIFF"; then
+    NODEJS_DIFF_RAN=true
+    NODEJS_DIFF_STATUS="Diffed pre/post snapshots - see \`.ddev/commands/host/nodejs/output/diff.*.json\` for per-page detail."
+  else
+    NODEJS_DIFF_STATUS="**FAILED** - see \`.ddev/commands/host/reports/post-upgrade-nodejs-diff-raw.txt\`"
+    warn "ddev nodejs-diff failed - see .ddev/commands/host/reports/post-upgrade-nodejs-diff-raw.txt"
+  fi
+elif $NODEJS_SCRAPE_RAN; then
+  NODEJS_DIFF_STATUS="**skipped** - \`.ddev/commands/host/nodejs-diff\` not installed."
+  warn "nodejs-diff not installed - skipping visual diff."
+else
+  NODEJS_DIFF_STATUS="**skipped** - post-upgrade snapshot was not captured."
+fi
 
 ########################################
 # Write report
@@ -138,6 +180,17 @@ log "Writing report to .ddev/commands/host/reports/post-upgrade.md"
   echo "### dblog findings - Emergency / Critical / Error / Warning (during this phase)"
   echo
   echo "$PHASE2_WATCHDOG"
+  echo
+  echo "## 3. Visual regression (nodejs-scrape / nodejs-diff)"
+  echo
+  echo "- Scrape: $NODEJS_SCRAPE_STATUS"
+  if $NODEJS_SCRAPE_RAN; then
+    echo "- Scrape output: \`.ddev/commands/host/reports/post-upgrade-nodejs-scrape-raw.txt\`"
+  fi
+  echo "- Diff: $NODEJS_DIFF_STATUS"
+  if $NODEJS_DIFF_RAN; then
+    echo "- Diff output: \`.ddev/commands/host/reports/post-upgrade-nodejs-diff-raw.txt\`"
+  fi
   echo
 } > "$REPORT"
 
