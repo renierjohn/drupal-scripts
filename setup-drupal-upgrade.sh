@@ -40,7 +40,10 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 SKILL_DIR="$PROJECT_ROOT/.claude/skills/d11-upgrade"
 DDEV_HOST_DIR="$PROJECT_ROOT/.ddev/commands/host"
 
+trap 'rm -f "$PROJECT_ROOT"/.solr-check-*.php 2>/dev/null' EXIT
+
 log()  { printf '\033[1;34m==>\033[0m %s\n' "$1"; }
+warn() { printf '\033[1;33m!!\033[0m %s\n' "$1"; }
 fail() { printf '\033[1;31m!!\033[0m %s\n' "$1" >&2; exit 1; }
 
 [ -d "$SOURCE_DIR" ] || fail "Source directory not found: $SOURCE_DIR"
@@ -147,6 +150,144 @@ prompt_site_domain() {
   log "Saved BASE_URL=$input -> ${env_file#"$PROJECT_ROOT"/}"
 }
 
+# Emits one line per search_api server using a Solr backend:
+#   <server_id>|<UP|DOWN>|<connector_plugin_id>|<core_name>
+# via a throwaway drush php:script (requires ddev to be running/bootstrapped).
+solr_check_php() {
+  local tmp_php rel_php result
+  tmp_php="$(mktemp "$PROJECT_ROOT/.solr-check-XXXXXX.php")"
+  cat > "$tmp_php" <<'PHP'
+<?php
+if (!\Drupal::hasContainer() || !\Drupal::moduleHandler()->moduleExists('search_api')) {
+  echo "NO_SEARCH_API" . PHP_EOL;
+  return;
+}
+$storage = \Drupal::entityTypeManager()->getStorage('search_api_server');
+$found = FALSE;
+foreach ($storage->loadMultiple() as $server) {
+  if (!$server->hasValidBackend()) {
+    continue;
+  }
+  $backend = $server->getBackend();
+  $plugin_id = $backend->getPluginId();
+  if (stripos($plugin_id, 'solr') === FALSE) {
+    continue;
+  }
+  $found = TRUE;
+  $config = $backend->getConfiguration();
+  $connector = $config['connector'] ?? '';
+  $core = $config['connector_config']['core'] ?? '';
+  $available = FALSE;
+  try {
+    $available = $server->status() && $server->isAvailable();
+  }
+  catch (\Throwable $e) {
+  }
+  echo implode('|', [$server->id(), $available ? 'UP' : 'DOWN', $connector, $core]) . PHP_EOL;
+}
+if (!$found) {
+  echo "NO_SOLR_SERVER" . PHP_EOL;
+}
+PHP
+  rel_php="${tmp_php#"$PROJECT_ROOT"/}"
+  result="$(ddev drush php:script "$rel_php" 2>&1)" || true
+  rm -f "$tmp_php"
+  printf '%s\n' "$result"
+}
+
+check_solr() {
+  if ! grep -q '"drupal/search_api_solr"' composer.json 2>/dev/null; then
+    log "Solr: drupal/search_api_solr not in composer.json - skipping Solr setup."
+    return
+  fi
+  log "Solr: drupal/search_api_solr found in composer.json - checking the DDEV Solr service ..."
+
+  local solr_compose="$PROJECT_ROOT/.ddev/docker-compose.solr.yaml"
+  local needs_restart=false
+
+  if [ ! -f "$solr_compose" ]; then
+    log "DDEV Solr add-on not installed (.ddev/docker-compose.solr.yaml missing)."
+    if confirm "Install the DDEV Solr add-on (ddev get ddev/ddev-drupal-solr) now?"; then
+      ddev get ddev/ddev-drupal-solr || fail "Failed to install the DDEV Solr add-on."
+      needs_restart=true
+    else
+      warn "Skipping Solr setup - install it later with 'ddev get ddev/ddev-drupal-solr' then re-run this script."
+      return
+    fi
+  fi
+
+  ddev exec -s solr curl -fsS -o /dev/null http://localhost:8983/solr/ >/dev/null 2>&1 || needs_restart=true
+
+  if $needs_restart; then
+    log "(Re)starting DDEV so the Solr service is up ..."
+    ddev restart || fail "ddev restart failed while bringing up Solr."
+  fi
+
+  if ddev exec -s solr curl -fsS -o /dev/null http://localhost:8983/solr/ >/dev/null 2>&1; then
+    log "Solr container is up."
+  else
+    warn "Solr container is still not responding. Check 'ddev logs -s solr' for details - skipping connectivity check."
+    return
+  fi
+
+  log "Checking whether the site's search_api Solr server(s) can connect ..."
+  local solr_status server_id status connector core fixed_any=false
+  solr_status="$(solr_check_php)"
+
+  if echo "$solr_status" | grep -q "NO_SEARCH_API"; then
+    warn "Could not bootstrap Drupal to check search_api - re-run this script once the site is installed to verify Solr connectivity."
+    return
+  fi
+  if echo "$solr_status" | grep -q "NO_SOLR_SERVER"; then
+    log "No search_api server is configured to use a Solr backend - nothing to connect."
+    return
+  fi
+
+  while IFS='|' read -r server_id status connector core; do
+    [ -z "$server_id" ] && continue
+    case "$status" in UP|DOWN) ;; *) continue ;; esac
+    if [ "$status" = "UP" ]; then
+      log "Solr server '$server_id' ($connector connector): connected."
+      continue
+    fi
+    if [ "$connector" != "standard" ]; then
+      warn "Solr server '$server_id' ($connector connector) is not connected - leaving it alone (only the local 'standard' connector is auto-configured; a '$connector' connector is meant for a different environment)."
+      continue
+    fi
+    log "Solr server '$server_id' is not connected. Pointing it at DDEV's Solr service (host=solr, port=8983) ..."
+    ddev drush config:set "search_api.server.$server_id" backend_config.connector_config.scheme http -y >/dev/null 2>&1 || true
+    ddev drush config:set "search_api.server.$server_id" backend_config.connector_config.host solr -y >/dev/null 2>&1 || true
+    ddev drush config:set "search_api.server.$server_id" backend_config.connector_config.port 8983 -y >/dev/null 2>&1 || true
+    fixed_any=true
+
+    if [ -n "$core" ]; then
+      local current_core
+      current_core="$(ddev exec -s solr printenv SOLR_CORENAME 2>/dev/null | tr -d '\r')" || true
+      if [ "$current_core" != "$core" ]; then
+        log "Aligning DDEV's Solr core name with the server's configured core ('$core') ..."
+        ddev config --web-environment-add="SOLR_CORENAME=$core" >/dev/null 2>&1 || warn "Could not set SOLR_CORENAME via 'ddev config' - set it manually in .ddev/config.yaml (web_environment) if the core name still doesn't match."
+      fi
+    fi
+  done <<< "$solr_status"
+
+  if $fixed_any; then
+    log "Applied Solr fixes - restarting DDEV to apply them ..."
+    ddev restart || fail "ddev restart failed while reconfiguring Solr."
+    ddev drush cr >/dev/null 2>&1 || true
+
+    solr_status="$(solr_check_php)"
+    while IFS='|' read -r server_id status connector core; do
+      [ -z "$server_id" ] && continue
+      case "$status" in UP|DOWN) ;; *) continue ;; esac
+      if [ "$status" = "UP" ]; then
+        log "Solr server '$server_id': now connected."
+      else
+        warn "Solr server '$server_id' is still not connected. Check 'ddev logs -s solr' and its connector settings (host/port/core) manually."
+      fi
+    done <<< "$solr_status"
+  fi
+}
+
 log "Installing D10->D11 upgrade toolkit from drupal-scripts/ ..."
 
 install_file "$SOURCE_DIR/skills/d11-upgrade/SKILL.md" "$SKILL_DIR/SKILL.md" "plain"
@@ -177,6 +318,9 @@ log "nodejs toolkit dependencies installed."
 
 prompt_site_domain
 
-log "Done. Run 'ddev pre-upgrade' to generate the audit reports, 'ddev run-upgrade' to start the upgrade, then 'ddev post-upgrade' to smoke-test the site afterward."
-
+log "Starting DDEV ..."
 ddev start
+
+check_solr
+
+log "Done. Run 'ddev pre-upgrade' to generate the audit reports, 'ddev run-upgrade' to start the upgrade, then 'ddev post-upgrade' to smoke-test the site afterward."
