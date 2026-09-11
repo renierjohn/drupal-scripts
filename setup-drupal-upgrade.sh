@@ -6,7 +6,7 @@
 # from this drupal-scripts/ directory into their expected locations in the
 # parent project:
 #
-#   drupal-scripts/d11-upgrade/SKILL.md            -> .claude/skills/d11-upgrade/SKILL.md
+#   drupal-scripts/skills/d11-upgrade/SKILL.md     -> .claude/skills/d11-upgrade/SKILL.md
 #   drupal-scripts/pre-upgrade                     -> .ddev/commands/host/pre-upgrade
 #   drupal-scripts/pre-upgrade-scan.php            -> .ddev/commands/host/pre-upgrade-scan.php
 #   drupal-scripts/ckeditor5-checklist-scan.php    -> .ddev/commands/host/ckeditor5-checklist-scan.php
@@ -149,7 +149,7 @@ prompt_site_domain() {
 
 log "Installing D10->D11 upgrade toolkit from drupal-scripts/ ..."
 
-install_file "$SOURCE_DIR/d11-upgrade/SKILL.md" "$SKILL_DIR/SKILL.md" "plain"
+install_file "$SOURCE_DIR/skills/d11-upgrade/SKILL.md" "$SKILL_DIR/SKILL.md" "plain"
 
 install_file "$SOURCE_DIR/pre-upgrade" "$DDEV_HOST_DIR/pre-upgrade" "exec"
 install_file "$SOURCE_DIR/pre-upgrade-scan.php" "$DDEV_HOST_DIR/pre-upgrade-scan.php" "exec"

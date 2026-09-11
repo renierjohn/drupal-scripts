@@ -7,7 +7,7 @@ Portable ddev + Claude Code toolkit for auditing and executing a Drupal 10 → 1
 | File | Installs to | Purpose |
 |---|---|---|
 | `setup-drupal-upgrade.sh` | (run from here, stays here) | Installer - copies everything else below into place |
-| `d11-upgrade/SKILL.md` | `.claude/skills/d11-upgrade/SKILL.md` | Claude Code skill: the step-by-step upgrade execution plan |
+| `skills/d11-upgrade/SKILL.md` | `.claude/skills/d11-upgrade/SKILL.md` | Claude Code skill: the step-by-step upgrade execution plan |
 | `pre-upgrade` | `.ddev/commands/host/pre-upgrade` | `ddev pre-upgrade` - audits the project and writes the reports the skill reads |
 | `pre-upgrade-scan.php` | `.ddev/commands/host/pre-upgrade-scan.php` | Helper invoked by `pre-upgrade` (module classification, custom code, removed-core-module scan) |
 | `ckeditor5-checklist-scan.php` | `.ddev/commands/host/ckeditor5-checklist-scan.php` | Helper invoked by `pre-upgrade` (CKEditor 4→5 detection + plugin compatibility) |
@@ -20,7 +20,7 @@ Portable ddev + Claude Code toolkit for auditing and executing a Drupal 10 → 1
 | `nodejs-diff` | `.ddev/commands/host/nodejs-diff` | `ddev nodejs-diff [preLabel] [postLabel]` - runs `nodejs/diff.js` via yarn to diff two labeled `nodejs-scrape` runs |
 | `nodejs/scrape.js`, `nodejs/diff.js`, `nodejs/package.json`, `nodejs/yarn.lock`, `nodejs/.gitignore` | `.ddev/commands/host/nodejs/` | Playwright-based scraper/diff toolkit invoked by `nodejs-scrape`/`nodejs-diff` |
 
-Skills live one-per-subdirectory (`d11-upgrade/SKILL.md`, matching `.claude/skills/<name>/SKILL.md`), so additional skills can be added later as sibling directories (e.g. `another-skill/SKILL.md`) without colliding.
+Skills live under `skills/`, one per subdirectory (`skills/d11-upgrade/SKILL.md`, matching `.claude/skills/<name>/SKILL.md`), so additional skills can be added later as sibling directories (e.g. `skills/another-skill/SKILL.md`) without colliding.
 
 ## Requirements
 
