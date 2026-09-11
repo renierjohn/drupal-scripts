@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+
+## Description: Run the D11 upgrade display-check scraper (node scrape.js) via yarn
+## Usage: nodejs-scrape [label] [path ...]
+## Example: "ddev nodejs-scrape pre" or "ddev nodejs-scrape post /about"
+
+set -uo pipefail
+
+PROJECT_ROOT="${DDEV_APPROOT:-$(pwd)}"
+SCRIPT_DIR="$PROJECT_ROOT/.ddev/commands/host/nodejs"
+
+cd "$SCRIPT_DIR" || exit 1
+
+if ! command -v yarn >/dev/null 2>&1; then
+  echo "yarn CLI not found on PATH. Install yarn first, then re-run 'ddev nodejs-scrape'." >&2
+  exit 1
+fi
+
+if [ ! -d node_modules ]; then
+  echo "node_modules missing, running 'yarn install' first..." >&2
+  yarn install || exit 1
+fi
+
+exec yarn scrape "$@"

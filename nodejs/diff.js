@@ -6,7 +6,7 @@
  * differs. Elements are matched by their full xpath.
  *
  * Usage:
- *   node compare.js [preLabel] [postLabel]
+ *   node diff.js [preLabel] [postLabel]
  *
  * Defaults: preLabel="pre", postLabel="post"
  *

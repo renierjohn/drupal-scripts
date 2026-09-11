@@ -16,6 +16,9 @@ Portable ddev + Claude Code toolkit for auditing and executing a Drupal 10 → 1
 | `post-upgrade-menu-links.php` | `.ddev/commands/host/post-upgrade-menu-links.php` | Helper invoked by `post-upgrade` (enumerates the 'main' menu's internal links via Drupal's menu API) |
 | `post-upgrade-admin-paths.php` | `.ddev/commands/host/post-upgrade-admin-paths.php` | Helper invoked by `post-upgrade` (enumerates the 'admin' menu's top-level sections, their direct child links, and their tabs/local tasks via Drupal's menu and local-task APIs) |
 | `post-upgrade-watchdog.php` | `.ddev/commands/host/post-upgrade-watchdog.php` | Helper invoked by `post-upgrade` (reads new dblog Emergency/Critical/Error/Warning entries since a given timestamp) |
+| `nodejs-scrape` | `.ddev/commands/host/nodejs-scrape` | `ddev nodejs-scrape [label] [path ...]` - runs `nodejs/scrape.js` via yarn to capture pre/post XPath + computed CSS snapshots for visual diffing |
+| `nodejs-diff` | `.ddev/commands/host/nodejs-diff` | `ddev nodejs-diff [preLabel] [postLabel]` - runs `nodejs/diff.js` via yarn to diff two labeled `nodejs-scrape` runs |
+| `nodejs/scrape.js`, `nodejs/diff.js`, `nodejs/package.json`, `nodejs/yarn.lock`, `nodejs/.gitignore` | `.ddev/commands/host/nodejs/` | Playwright-based scraper/diff toolkit invoked by `nodejs-scrape`/`nodejs-diff` |
 
 Skills live one-per-subdirectory (`d11-upgrade/SKILL.md`, matching `.claude/skills/<name>/SKILL.md`), so additional skills can be added later as sibling directories (e.g. `another-skill/SKILL.md`) without colliding.
 
@@ -40,6 +43,11 @@ Skills live one-per-subdirectory (`d11-upgrade/SKILL.md`, matching `.claude/skil
    ddev pre-upgrade
    ```
    Writes `pre-upgrade.md` and `ckeditor5-checklist.md` (plus raw scanner output) to `.ddev/commands/host/reports/`. Read `pre-upgrade.md` first - it flags any CRITICAL blocker (e.g. a module enabled in the DB with no code on disk) that will break later steps if left unresolved.
+   Optionally, capture a visual baseline before touching any code:
+   ```bash
+   ddev nodejs-scrape pre
+   ```
+   Installs the `nodejs/` toolkit's dependencies on first run (`yarn install`, including a Playwright Chromium download), then captures full XPath + computed CSS/layout snapshots of the header/footer/main-content regions for every page discovered via the homepage's main menu (or pass explicit paths), writing `output/pre.*.json`. After the upgrade, run `ddev nodejs-scrape post` and then `ddev nodejs-diff` to diff the two runs and flag any unintended visual/layout changes.
 4. Execute the upgrade:
    - **Guided (recommended):** `ddev run-upgrade` - opens an interactive Claude Code session pre-loaded with `/d11-upgrade run`. You approve each tool call as it runs; nothing executes unattended.
    - **Manual:** open `.claude/skills/d11-upgrade/SKILL.md` and work through its phases yourself, using the two reports as the source of truth for what needs upgrading.

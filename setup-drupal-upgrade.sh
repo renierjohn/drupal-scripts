@@ -15,6 +15,13 @@
 #   drupal-scripts/post-upgrade-menu-links.php      -> .ddev/commands/host/post-upgrade-menu-links.php
 #   drupal-scripts/post-upgrade-admin-paths.php     -> .ddev/commands/host/post-upgrade-admin-paths.php
 #   drupal-scripts/post-upgrade-watchdog.php        -> .ddev/commands/host/post-upgrade-watchdog.php
+#   drupal-scripts/nodejs-scrape                    -> .ddev/commands/host/nodejs-scrape
+#   drupal-scripts/nodejs-diff                      -> .ddev/commands/host/nodejs-diff
+#   drupal-scripts/nodejs/scrape.js                 -> .ddev/commands/host/nodejs/scrape.js
+#   drupal-scripts/nodejs/diff.js                   -> .ddev/commands/host/nodejs/diff.js
+#   drupal-scripts/nodejs/package.json              -> .ddev/commands/host/nodejs/package.json
+#   drupal-scripts/nodejs/yarn.lock                 -> .ddev/commands/host/nodejs/yarn.lock
+#   drupal-scripts/nodejs/.gitignore                -> .ddev/commands/host/nodejs/.gitignore
 #
 # This script lives INSIDE drupal-scripts/ - run it from the project root as
 # ./drupal-scripts/setup-drupal-upgrade.sh (or from anywhere; it resolves its
@@ -59,6 +66,14 @@ install_file "$SOURCE_DIR/post-upgrade" "$DDEV_HOST_DIR/post-upgrade" "exec"
 install_file "$SOURCE_DIR/post-upgrade-menu-links.php" "$DDEV_HOST_DIR/post-upgrade-menu-links.php" "exec"
 install_file "$SOURCE_DIR/post-upgrade-admin-paths.php" "$DDEV_HOST_DIR/post-upgrade-admin-paths.php" "exec"
 install_file "$SOURCE_DIR/post-upgrade-watchdog.php" "$DDEV_HOST_DIR/post-upgrade-watchdog.php" "exec"
+
+install_file "$SOURCE_DIR/nodejs-scrape" "$DDEV_HOST_DIR/nodejs-scrape" "exec"
+install_file "$SOURCE_DIR/nodejs-diff" "$DDEV_HOST_DIR/nodejs-diff" "exec"
+install_file "$SOURCE_DIR/nodejs/scrape.js" "$DDEV_HOST_DIR/nodejs/scrape.js" "plain"
+install_file "$SOURCE_DIR/nodejs/diff.js" "$DDEV_HOST_DIR/nodejs/diff.js" "plain"
+install_file "$SOURCE_DIR/nodejs/package.json" "$DDEV_HOST_DIR/nodejs/package.json" "plain"
+install_file "$SOURCE_DIR/nodejs/yarn.lock" "$DDEV_HOST_DIR/nodejs/yarn.lock" "plain"
+install_file "$SOURCE_DIR/nodejs/.gitignore" "$DDEV_HOST_DIR/nodejs/.gitignore" "plain"
 
 log "Done. Run 'ddev pre-upgrade' to generate the audit reports, 'ddev run-upgrade' to start the upgrade, then 'ddev post-upgrade' to smoke-test the site afterward."
 

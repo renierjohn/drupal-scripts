@@ -6,8 +6,8 @@
   "main": "scrape.js",
   "scripts": {
     "postinstall": "playwright install chromium",
-    "start": "node scrape.js",
-    "diff": "node compare.js"
+    "scrape": "node scrape.js",
+    "diff": "node diff.js"
   },
   "dependencies": {
     "playwright": "^1.48.0"
