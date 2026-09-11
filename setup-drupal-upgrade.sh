@@ -54,6 +54,67 @@ install_file() {
   log "Installed $(basename "$src") -> ${dest#"$PROJECT_ROOT"/}"
 }
 
+confirm() {
+  local reply
+  read -rp "$1 [y/N] " reply || reply=""
+  case "$reply" in
+    [yY]|[yY][eE][sS]) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+check_node() {
+  local ver major
+  if command -v node >/dev/null 2>&1; then
+    ver="$(node -v)"
+    major="${ver#v}"; major="${major%%.*}"
+    if [ "$major" -ge 22 ] 2>/dev/null; then
+      log "Node.js $ver found (>= 22 required) - OK"
+      return
+    fi
+    log "Node.js $ver found, but the nodejs-scrape/nodejs-diff toolkit needs >= 22."
+  else
+    log "Node.js not found on PATH."
+  fi
+
+  if confirm "Install Node.js 22 now?"; then
+    if command -v brew >/dev/null 2>&1; then
+      brew install node@22 || fail "Failed to install Node.js via Homebrew."
+      brew link --overwrite --force node@22 || true
+    elif command -v nvm >/dev/null 2>&1; then
+      nvm install 22 && nvm use 22
+    else
+      fail "No supported installer found (Homebrew or nvm). Install Node.js 22+ manually: https://nodejs.org/ then re-run this script."
+    fi
+    command -v node >/dev/null 2>&1 || fail "Node.js install did not put 'node' on PATH. Open a new shell (or fix PATH) and re-run this script."
+    log "Node.js $(node -v) installed."
+  else
+    fail "Node.js 22+ is required for the nodejs-scrape/nodejs-diff toolkit. Install it and re-run this script."
+  fi
+}
+
+check_yarn() {
+  if command -v yarn >/dev/null 2>&1; then
+    log "yarn found ($(yarn -v)) - OK"
+    return
+  fi
+
+  log "yarn not found on PATH."
+  if confirm "Install yarn now?"; then
+    if command -v brew >/dev/null 2>&1; then
+      brew install yarn || fail "Failed to install yarn via Homebrew."
+    elif command -v npm >/dev/null 2>&1; then
+      npm install -g yarn || fail "Failed to install yarn via npm."
+    else
+      fail "No supported installer found (Homebrew or npm). Install yarn manually: https://yarnpkg.com/getting-started/install then re-run this script."
+    fi
+    command -v yarn >/dev/null 2>&1 || fail "yarn install did not put 'yarn' on PATH. Open a new shell (or fix PATH) and re-run this script."
+    log "yarn $(yarn -v) installed."
+  else
+    fail "yarn is required for the nodejs-scrape/nodejs-diff toolkit. Install it and re-run this script."
+  fi
+}
+
 log "Installing D10->D11 upgrade toolkit from drupal-scripts/ ..."
 
 install_file "$SOURCE_DIR/d11-upgrade/SKILL.md" "$SKILL_DIR/SKILL.md" "plain"
@@ -74,6 +135,13 @@ install_file "$SOURCE_DIR/nodejs/diff.js" "$DDEV_HOST_DIR/nodejs/diff.js" "plain
 install_file "$SOURCE_DIR/nodejs/package.json" "$DDEV_HOST_DIR/nodejs/package.json" "plain"
 install_file "$SOURCE_DIR/nodejs/yarn.lock" "$DDEV_HOST_DIR/nodejs/yarn.lock" "plain"
 install_file "$SOURCE_DIR/nodejs/.gitignore" "$DDEV_HOST_DIR/nodejs/.gitignore" "plain"
+
+check_node
+check_yarn
+
+log "Installing nodejs toolkit dependencies (yarn install in .ddev/commands/host/nodejs) ..."
+( cd "$DDEV_HOST_DIR/nodejs" && yarn install ) || fail "yarn install failed in ${DDEV_HOST_DIR#"$PROJECT_ROOT"/}/nodejs"
+log "nodejs toolkit dependencies installed."
 
 log "Done. Run 'ddev pre-upgrade' to generate the audit reports, 'ddev run-upgrade' to start the upgrade, then 'ddev post-upgrade' to smoke-test the site afterward."
 
