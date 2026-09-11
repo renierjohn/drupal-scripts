@@ -13,6 +13,7 @@ REPORTS_DIR="$PROJECT_ROOT/.ddev/commands/host/reports"
 mkdir -p "$REPORTS_DIR"
 REPORT="$REPORTS_DIR/post-upgrade.md"
 MENU_LINKS_PHP=".ddev/commands/host/post-upgrade-menu-links.php"
+ADMIN_PATHS_PHP=".ddev/commands/host/post-upgrade-admin-paths.php"
 WATCHDOG_PHP=".ddev/commands/host/post-upgrade-watchdog.php"
 COOKIEJAR="$(mktemp)"
 
@@ -86,16 +87,17 @@ log "Step 2/2: visiting admin pages via drush uli"
 ULI="$(ddev drush uli 2>&1 | tail -1)"
 LOGIN_CODE="$(curl -s -L -c "$COOKIEJAR" -b "$COOKIEJAR" -o /dev/null -w '%{http_code}' --max-time 15 "$ULI" 2>/dev/null)"
 
-ADMIN_PATHS=(
-  "/admin"
-  "/admin/content"
-  "/admin/structure"
-  "/admin/config"
-  "/admin/people"
-  "/admin/appearance"
-  "/admin/modules"
-  "/admin/reports/status"
-)
+ADMIN_PATHS_OUTPUT="$(ddev drush php:script "$ADMIN_PATHS_PHP" 2>&1)"
+ADMIN_PATHS_RAW="$(echo "$ADMIN_PATHS_OUTPUT" | grep '^/' || true)"
+if [ -z "$ADMIN_PATHS_RAW" ]; then
+  warn "Could not load admin menu links via drush (bootstrap issue?). Falling back to /admin only."
+  ADMIN_PATHS_RAW="/admin"
+fi
+ADMIN_PATHS=()
+while IFS= read -r path; do
+  [ -z "$path" ] && continue
+  ADMIN_PATHS+=("$path")
+done <<< "$ADMIN_PATHS_RAW"
 
 PHASE2_START=$(date +%s)
 PHASE2_RESULTS=()

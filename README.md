@@ -14,6 +14,7 @@ Portable ddev + Claude Code toolkit for auditing and executing a Drupal 10 → 1
 | `run-upgrade` | `.ddev/commands/host/run-upgrade` | `ddev run-upgrade` - opens an interactive Claude Code session that runs `/d11-upgrade run` |
 | `post-upgrade` | `.ddev/commands/host/post-upgrade` | `ddev post-upgrade` - visits the homepage + main-menu pages and admin pages, checks dblog for new errors, saves the report |
 | `post-upgrade-menu-links.php` | `.ddev/commands/host/post-upgrade-menu-links.php` | Helper invoked by `post-upgrade` (enumerates the 'main' menu's internal links via Drupal's menu API) |
+| `post-upgrade-admin-paths.php` | `.ddev/commands/host/post-upgrade-admin-paths.php` | Helper invoked by `post-upgrade` (enumerates the 'admin' menu's top-level sections, their direct child links, and their tabs/local tasks via Drupal's menu and local-task APIs) |
 | `post-upgrade-watchdog.php` | `.ddev/commands/host/post-upgrade-watchdog.php` | Helper invoked by `post-upgrade` (reads new dblog Emergency/Critical/Error/Warning entries since a given timestamp) |
 
 Skills live one-per-subdirectory (`d11-upgrade/SKILL.md`, matching `.claude/skills/<name>/SKILL.md`), so additional skills can be added later as sibling directories (e.g. `another-skill/SKILL.md`) without colliding.
@@ -47,7 +48,7 @@ Skills live one-per-subdirectory (`d11-upgrade/SKILL.md`, matching `.claude/skil
    ```bash
    ddev post-upgrade
    ```
-   Visits the homepage plus every enabled link in the site's `main` menu (anonymously), then generates a `drush uli` login and visits a set of core admin pages (`/admin`, `/admin/content`, `/admin/structure`, `/admin/config`, `/admin/people`, `/admin/appearance`, `/admin/modules`, `/admin/reports/status`) using that authenticated session. After each phase it checks the dblog for any new Emergency/Critical/Error/Warning entries logged during that phase specifically (not the site's full log history) and writes everything to `post-upgrade.md`.
+   Visits the homepage plus every enabled link in the site's `main` menu (anonymously), then generates a `drush uli` login and visits the site's `admin` menu using that authenticated session: `/admin`, its top-level sections (Content, Structure, Configuration, People, Appearance, Modules, Reports, Help), each section's direct child pages (e.g. Structure's Content types/Taxonomy/Menus/Views, Config's category pages), and each section's tabs (e.g. People's Permissions/Roles, Modules' Uninstall) - all discovered dynamically via Drupal's menu and local-task APIs rather than hardcoded, so it adapts to whatever admin menu structure the target site actually has. After each phase it checks the dblog for any new Emergency/Critical/Error/Warning entries logged during that phase specifically (not the site's full log history) and writes everything to `post-upgrade.md`.
 
 ## Notes
 
