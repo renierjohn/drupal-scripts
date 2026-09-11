@@ -7,6 +7,7 @@
 # parent project:
 #
 #   drupal-scripts/skills/d11-upgrade/SKILL.md     -> .claude/skills/d11-upgrade/SKILL.md
+#   drupal-scripts/skills/d11-post-upgrade/SKILL.md -> .claude/skills/d11-post-upgrade/SKILL.md
 #   drupal-scripts/pre-upgrade                     -> .ddev/commands/host/pre-upgrade
 #   drupal-scripts/pre-upgrade-scan.php            -> .ddev/commands/host/pre-upgrade-scan.php
 #   drupal-scripts/ckeditor5-checklist-scan.php    -> .ddev/commands/host/ckeditor5-checklist-scan.php
@@ -38,6 +39,7 @@ SOURCE_DIR="$SCRIPT_DIR"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 SKILL_DIR="$PROJECT_ROOT/.claude/skills/d11-upgrade"
+SKILL_DIR_POST="$PROJECT_ROOT/.claude/skills/d11-post-upgrade"
 DDEV_HOST_DIR="$PROJECT_ROOT/.ddev/commands/host"
 
 trap 'rm -f "$PROJECT_ROOT"/.solr-check-*.php 2>/dev/null' EXIT
@@ -292,6 +294,7 @@ check_solr() {
 log "Installing D10->D11 upgrade toolkit from drupal-scripts/ ..."
 
 install_file "$SOURCE_DIR/skills/d11-upgrade/SKILL.md" "$SKILL_DIR/SKILL.md" "plain"
+install_file "$SOURCE_DIR/skills/d11-post-upgrade/SKILL.md" "$SKILL_DIR_POST/SKILL.md" "plain"
 
 install_file "$SOURCE_DIR/pre-upgrade" "$DDEV_HOST_DIR/pre-upgrade" "exec"
 install_file "$SOURCE_DIR/pre-upgrade-scan.php" "$DDEV_HOST_DIR/pre-upgrade-scan.php" "exec"

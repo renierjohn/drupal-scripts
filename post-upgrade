@@ -195,3 +195,5 @@ log "Writing report to .ddev/commands/host/reports/post-upgrade.md"
 } > "$REPORT"
 
 log "Done. Report: .ddev/commands/host/reports/post-upgrade.md"
+
+exec claude "/d11-post-upgrade run"
