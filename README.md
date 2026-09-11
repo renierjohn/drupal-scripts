@@ -42,12 +42,7 @@ Skills live one-per-subdirectory (`d11-upgrade/SKILL.md`, matching `.claude/skil
    ```bash
    ddev pre-upgrade
    ```
-   Writes `pre-upgrade.md` and `ckeditor5-checklist.md` (plus raw scanner output) to `.ddev/commands/host/reports/`. Read `pre-upgrade.md` first - it flags any CRITICAL blocker (e.g. a module enabled in the DB with no code on disk) that will break later steps if left unresolved. It also installs/enables `drupal/stage_file_proxy` and points its origin at the `BASE_URL` saved in `.ddev/commands/host/.env` (see step 2 of setup) so local file requests fall back to the live site instead of 404ing.
-   Optionally, capture a visual baseline before touching any code:
-   ```bash
-   ddev nodejs-scrape pre
-   ```
-   Installs the `nodejs/` toolkit's dependencies on first run (`yarn install`, including a Playwright Chromium download), then captures full XPath + computed CSS/layout snapshots of the header/footer/main-content regions for every page discovered via the homepage's main menu (or pass explicit paths), writing `output/pre.*.json`. After the upgrade, run `ddev nodejs-scrape post` and then `ddev nodejs-diff` to diff the two runs and flag any unintended visual/layout changes.
+   Writes `pre-upgrade.md` and `ckeditor5-checklist.md` (plus raw scanner output) to `.ddev/commands/host/reports/`. Read `pre-upgrade.md` first - it flags any CRITICAL blocker (e.g. a module enabled in the DB with no code on disk) that will break later steps if left unresolved. It also installs/enables `drupal/stage_file_proxy` and points its origin at the `BASE_URL` saved in `.ddev/commands/host/.env` (see step 2 of setup) so local file requests fall back to the live site instead of 404ing, then runs `ddev nodejs-scrape pre` to capture a visual baseline (full XPath + computed CSS/layout snapshots of the header/footer/main-content regions for every page discovered via the homepage's main menu) before any code changes, writing `.ddev/commands/host/nodejs/output/pre.*.json`. After the upgrade, run `ddev nodejs-scrape post` and then `ddev nodejs-diff` to diff the two runs and flag any unintended visual/layout changes.
 4. Execute the upgrade:
    - **Guided (recommended):** `ddev run-upgrade` - opens an interactive Claude Code session pre-loaded with `/d11-upgrade run`. You approve each tool call as it runs; nothing executes unattended.
    - **Manual:** open `.claude/skills/d11-upgrade/SKILL.md` and work through its phases yourself, using the two reports as the source of truth for what needs upgrading.
