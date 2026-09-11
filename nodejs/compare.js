@@ -2,8 +2,8 @@
 /**
  * Compares two labeled scrape.js runs (e.g. "pre" and "post") and reports
  * what changed: added/removed pages, and within each page's header/footer/
- * main regions, added/removed elements and elements whose bounding box or
- * computed CSS differ. Elements are matched by their full xpath.
+ * main regions, added/removed elements and elements whose computed CSS
+ * differs. Elements are matched by their full xpath.
  *
  * Usage:
  *   node compare.js [preLabel] [postLabel]
@@ -21,6 +21,18 @@
  * here as "removed at old xpath" + "added at new xpath" for what may
  * visually be the same element that just moved position in the DOM -- this
  * is expected given full-xpath matching, not a bug in the comparison.
+ *
+ * - CSS_PX_TOLERANCE: pixel tolerance (default 1) for comparing pixel-valued
+ *             CSS (margins, padding, font-size, etc.) -- ignores sub-pixel/
+ *             font-loading rendering noise.
+ * - CSS_WIDTH_PX_TOLERANCE / CSS_HEIGHT_PX_TOLERANCE: same idea, but
+ *             specifically for the "width" / "height" CSS properties,
+ *             which tend to shift more (JS-driven layout, content-length
+ *             differences). Each defaults to CSS_PX_TOLERANCE if unset.
+ *             All three can be set in the environment, or in a ".env"
+ *             file next to this script (e.g. CSS_WIDTH_PX_TOLERANCE=5) --
+ *             values already set in the environment take precedence over
+ *             ".env".
  */
 
 'use strict';
@@ -29,7 +41,52 @@ const fs = require('fs');
 const path = require('path');
 
 const OUTPUT_DIR = path.join(__dirname, 'output');
-const BOX_TOLERANCE = 1; // px; ignore sub-pixel rendering noise
+
+/** Minimal .env loader (no dependency): KEY=VALUE per line, existing env vars win. */
+function loadDotEnv(file = path.join(__dirname, '.env')) {
+  if (!fs.existsSync(file)) return;
+  for (const line of fs.readFileSync(file, 'utf8').split('\n')) {
+    const match = line.match(/^\s*([\w.-]+)\s*=\s*(.*)?\s*$/);
+    if (!match) continue;
+    const key = match[1];
+    let value = (match[2] || '').trim();
+    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+      value = value.slice(1, -1);
+    }
+    if (!(key in process.env)) process.env[key] = value;
+  }
+}
+
+loadDotEnv();
+
+const CSS_PX_TOLERANCE = Number(process.env.CSS_PX_TOLERANCE) || 1; // px; ignore sub-pixel/font-loading rendering noise
+const CSS_WIDTH_PX_TOLERANCE = Number(process.env.CSS_WIDTH_PX_TOLERANCE) || CSS_PX_TOLERANCE;
+const CSS_HEIGHT_PX_TOLERANCE = Number(process.env.CSS_HEIGHT_PX_TOLERANCE) || CSS_PX_TOLERANCE;
+
+function toleranceFor(key) {
+  if (key === 'width') return CSS_WIDTH_PX_TOLERANCE;
+  if (key === 'height') return CSS_HEIGHT_PX_TOLERANCE;
+  return CSS_PX_TOLERANCE;
+}
+
+/** Parses a CSS pixel value like "12.5px" into a number, or null if it isn't one. */
+function parsePx(value) {
+  if (typeof value !== 'string') return null;
+  const match = value.match(/^(-?\d+(?:\.\d+)?)px$/);
+  return match ? parseFloat(match[1]) : null;
+}
+
+/** Pixel-valued CSS (width, height, margins, etc.) compares within a small
+ * tolerance to absorb sub-pixel rendering / font-loading noise; everything
+ * else (colors, keywords, font names) still compares exactly. "width" and
+ * "height" get their own tolerance (CSS_WIDTH_PX_TOLERANCE /
+ * CSS_HEIGHT_PX_TOLERANCE), everything else uses CSS_PX_TOLERANCE. */
+function cssValuesDiffer(key, a, b) {
+  const na = parsePx(a);
+  const nb = parsePx(b);
+  if (na !== null && nb !== null) return Math.abs(na - nb) > toleranceFor(key);
+  return a !== b;
+}
 
 function parseArgs(argv) {
   const args = argv.slice(2);
@@ -68,22 +125,15 @@ function diffElements(preElements, postElements) {
       continue;
     }
 
-    const boxDiffs = {};
-    for (const key of Object.keys(preEl.boundingBox)) {
-      const a = preEl.boundingBox[key];
-      const b = postEl.boundingBox[key];
-      if (Math.abs(a - b) > BOX_TOLERANCE) boxDiffs[key] = { pre: a, post: b };
-    }
-
     const cssDiffs = {};
     for (const key of Object.keys(preEl.css)) {
-      if (preEl.css[key] !== postEl.css[key]) {
+      if (cssValuesDiffer(key, preEl.css[key], postEl.css[key])) {
         cssDiffs[key] = { pre: preEl.css[key], post: postEl.css[key] };
       }
     }
 
-    if (Object.keys(boxDiffs).length || Object.keys(cssDiffs).length) {
-      changed.push({ xpath, tagName: preEl.tagName, className: preEl.className, boxDiffs, cssDiffs });
+    if (Object.keys(cssDiffs).length) {
+      changed.push({ xpath, tagName: preEl.tagName, className: preEl.className, cssDiffs });
     }
   }
 

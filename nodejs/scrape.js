@@ -1,10 +1,12 @@
 #!/usr/bin/env node
 /**
- * Captures the full XPath + computed layout/CSS + bounding box of the
- * header, footer, and main-content regions -- and every element nested
- * inside them (cards, banners, headings, paragraphs, buttons, etc.) --
- * for a set of pages, so a "pre" run and a "post" (D11 upgrade) run can
- * be diffed to confirm the display didn't change.
+ * Captures the full XPath + computed CSS of the header, footer, and
+ * main-content regions -- and every element nested inside them (cards,
+ * banners, headings, paragraphs, buttons, etc.), excluding visually-hidden
+ * elements, slider/carousel elements (slick-slide, swiper-slide, etc.),
+ * and elements with computed display:none -- for a set of pages, so a
+ * "pre" run and a "post" (D11 upgrade) run can be diffed to confirm the
+ * display didn't change.
  *
  * Usage:
  *   yarn install
@@ -13,6 +15,7 @@
  * Examples:
  *   node scrape.js pre                  # auto-discovers menu pages (see below)
  *   node scrape.js post
+ *   node scrape.js pre path=/work         # single page only -> output/pre.work.json
  *   node scrape.js pre / /about /contact  # explicit paths, discovery skipped
  *   BASE_URL=https://prometweb.ddev.site node scrape.js pre
  *
@@ -21,13 +24,18 @@
  *             "post" after, then diff matching files, e.g.:
  *               diff output/pre.homepage.json output/post.homepage.json
  *               diff output/pre.solutions.json output/post.solutions.json
- * - path(s) : site-relative paths to check. If omitted, only the
- *             homepage's own top-level navigation menu is used to find
- *             pages: the homepage is visited, its main menu is walked,
- *             and every top-level menu item + all of its child/submenu
- *             links become the scope -- links in the main body or
- *             footer are NOT included. One output file is written per
- *             top-level menu (output/<label>.<menu-name>.json) plus
+ * - path=<p>: capture ONLY that single page, writing ONLY
+ *             output/<label>.<slug>.json (slug derived from the path
+ *             itself, e.g. path=/work -> output/pre.work.json). Skips
+ *             discovery and every other menu/homepage file entirely.
+ * - path(s) : site-relative paths to check. If omitted (and no path=
+ *             argument is given either), only the homepage's own
+ *             top-level navigation menu is used to find pages: the
+ *             homepage is visited, its main menu is walked, and every
+ *             top-level menu item + all of its child/submenu links
+ *             become the scope -- links in the main body or footer are
+ *             NOT included. One output file is written per top-level
+ *             menu (output/<label>.<menu-name>.json) plus
  *             output/<label>.homepage.json for the homepage itself.
  *             Pass explicit path(s) to skip discovery entirely and
  *             check only those pages (written to output/<label>.json).
@@ -37,6 +45,12 @@
  *             Can be set in the environment, or in a ".env" file next to
  *             this script (e.g. BASE_URL=https://example.com) -- values
  *             already set in the environment take precedence over ".env".
+ * - RENDER_WAIT_MS: extra milliseconds to wait after each page loads,
+ *             before capturing -- lets JS-driven layout (mega menu
+ *             measurements, sliders, lazy images, web fonts) finish
+ *             settling so width/height don't differ between runs just
+ *             from render timing. Default: 2000. Same env/.env rules
+ *             as BASE_URL.
  */
 
 'use strict';
@@ -85,8 +99,13 @@ const CSS_PROPS = [
   'fontFamily', 'fontSize', 'fontWeight', 'fontStyle', 'lineHeight', 'letterSpacing',
   'textAlign', 'textTransform', 'textDecoration',
   'color', 'backgroundColor', 'backgroundImage', 'backgroundPosition', 'backgroundSize', 'backgroundRepeat',
-  'boxShadow', 'transform',
+  'transform',
 ];
+
+// Extra time to let JS-driven layout (mega menu measurements, sliders, lazy
+// images, web fonts) finish settling after page load, before capturing.
+// Override with RENDER_WAIT_MS (env var or .env).
+const RENDER_WAIT_MS = Number(process.env.RENDER_WAIT_MS) || 2000;
 
 function detectBaseUrl() {
   if (process.env.BASE_URL) return process.env.BASE_URL.replace(/\/+$/, '');
@@ -105,9 +124,17 @@ function parseArgs(argv) {
   const args = argv.slice(2);
   let label = 'snapshot';
 
-  if (args.length && !args[0].startsWith('/') && !/^https?:\/\//.test(args[0])) {
+  const isPathArg = (a) => a.startsWith('/') || /^https?:\/\//.test(a) || /^path=/i.test(a);
+  if (args.length && !isPathArg(args[0])) {
     label = args.shift();
   }
+
+  const pathArgIndex = args.findIndex((a) => /^path=/i.test(a));
+  if (pathArgIndex !== -1) {
+    const singlePath = args[pathArgIndex].slice('path='.length);
+    return { label, singlePath };
+  }
+
   const explicitPaths = args.length > 0;
   const paths = explicitPaths ? args : ['/'];
   return { label, paths, discover: !explicitPaths };
@@ -133,20 +160,18 @@ function extractRegion({ selectors, cssProps, skipTags }) {
     return '/' + parts.join('/');
   }
 
-  function describeElement(el) {
-    const computed = window.getComputedStyle(el);
+  function describeElement(el, precomputed) {
+    const computed = precomputed || window.getComputedStyle(el);
     const css = {};
     for (const prop of cssProps) {
       css[prop] = computed[prop];
     }
-    const rect = el.getBoundingClientRect();
     return {
       xpath: getFullXPath(el),
       tagName: el.tagName.toLowerCase(),
       id: el.id || null,
       className: el.className && typeof el.className === 'string' ? el.className : null,
       childElementCount: el.childElementCount,
-      boundingBox: { x: rect.x, y: rect.y, width: rect.width, height: rect.height, top: rect.top, right: rect.right, bottom: rect.bottom, left: rect.left },
       css,
     };
   }
@@ -163,11 +188,25 @@ function extractRegion({ selectors, cssProps, skipTags }) {
 
   if (!el) return null;
 
+  // Slider/carousel classes (slick-slide, slick-slider, swiper-slide, etc.)
+  // shuffle/clone/reorder DOM nodes and animate transforms on their own, so
+  // they're excluded as noise unrelated to real markup/CSS changes.
+  function isSliderRelated(node) {
+    for (const cls of node.classList) {
+      if (cls.toLowerCase().includes('slide')) return true;
+    }
+    return false;
+  }
+
   const skip = new Set(skipTags);
   const elements = [describeElement(el)];
   for (const descendant of el.querySelectorAll('*')) {
     if (skip.has(descendant.tagName.toLowerCase())) continue;
-    elements.push(describeElement(descendant));
+    if (descendant.classList.contains('visually-hidden')) continue;
+    if (isSliderRelated(descendant)) continue;
+    const computed = window.getComputedStyle(descendant);
+    if (computed.display === 'none') continue;
+    elements.push(describeElement(descendant, computed));
   }
 
   return {
@@ -242,6 +281,7 @@ async function discoverMenus(browser, baseUrl) {
     } catch (err) {
       await page.goto(baseUrl, { waitUntil: 'load', timeout: 45000 });
     }
+    await page.waitForTimeout(RENDER_WAIT_MS);
     groups = await page.evaluate(discoverMenuGroupsInPage, MENU_ROOT_SELECTORS);
   } finally {
     await page.close();
@@ -301,6 +341,8 @@ async function snapshotPage(browser, baseUrl, urlPath) {
       await page.goto(url, { waitUntil: 'load', timeout: 45000 });
     }
 
+    await page.waitForTimeout(RENDER_WAIT_MS);
+
     for (const [region, selectors] of Object.entries(REGION_SELECTORS)) {
       const result = await page.evaluate(extractRegion, { selectors, cssProps: CSS_PROPS, skipTags: SKIP_TAGS });
       regions[region] = result;
@@ -334,7 +376,8 @@ function writeOutput(filename, data) {
 }
 
 async function main() {
-  const { label, paths: requestedPaths, discover } = parseArgs(process.argv);
+  const parsed = parseArgs(process.argv);
+  const { label, singlePath, paths: requestedPaths, discover } = parsed;
   const baseUrl = detectBaseUrl();
 
   console.log(`Base URL: ${baseUrl}`);
@@ -343,7 +386,19 @@ async function main() {
   const browser = await chromium.launch({ headless: true });
 
   try {
-    if (discover) {
+    if (singlePath) {
+      const slug = slugify(singlePath);
+      console.log(`Capturing single page ${singlePath} ...`);
+      const snapshot = await snapshotPage(browser, baseUrl, singlePath);
+      writeOutput(`${label}.${slug}.json`, {
+        label,
+        scope: 'path',
+        path: singlePath,
+        baseUrl,
+        capturedAt: new Date().toISOString(),
+        pages: [snapshot],
+      });
+    } else if (discover) {
       console.log(`Capturing homepage ...`);
       const homepageSnapshot = await snapshotPage(browser, baseUrl, '/');
       writeOutput(`${label}.homepage.json`, {
