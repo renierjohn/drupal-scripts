@@ -251,12 +251,13 @@ check_solr() {
       continue
     fi
     if [ "$connector" != "standard" ]; then
-      warn "Solr server '$server_id' ($connector connector) is not connected - leaving it alone (only the local 'standard' connector is auto-configured; a '$connector' connector is meant for a different environment)."
-      continue
+      log "Solr server '$server_id' uses the '$connector' connector (not local-friendly) - switching it to 'standard' for local dev ..."
+      ddev drush config:set "search_api.server.$server_id" backend_config.connector standard -y >/dev/null 2>&1 || true
     fi
     log "Solr server '$server_id' is not connected. Pointing it at DDEV's Solr service (host=solr, port=8983) ..."
     ddev drush config:set "search_api.server.$server_id" backend_config.connector_config.scheme http -y >/dev/null 2>&1 || true
     ddev drush config:set "search_api.server.$server_id" backend_config.connector_config.host solr -y >/dev/null 2>&1 || true
+    ddev drush config:set "search_api.server.$server_id" backend_config.connector_config.core dev -y >/dev/null 2>&1 || true
     ddev drush config:set "search_api.server.$server_id" backend_config.connector_config.port 8983 -y >/dev/null 2>&1 || true
     fixed_any=true
 
@@ -323,4 +324,5 @@ ddev start
 
 check_solr
 
-log "Done. Run 'ddev pre-upgrade' to generate the audit reports, 'ddev run-upgrade' to start the upgrade, then 'ddev post-upgrade' to smoke-test the site afterward."
+log "Done"
+log "Run 'ddev pre-upgrade' to generate the audit reports, 'ddev run-upgrade' to start the upgrade, then 'ddev post-upgrade' to smoke-test the site afterward."
