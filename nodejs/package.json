@@ -1,0 +1,16 @@
+{
+  "name": "d11-display-check",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Captures full XPath + computed CSS/layout snapshots of header/footer/main-content for pre/post D11 upgrade visual diffing",
+  "main": "scrape.js",
+  "scripts": {
+    "postinstall": "playwright install chromium",
+    "start": "node scrape.js",
+    "diff": "node compare.js"
+  },
+  "dependencies": {
+    "playwright": "^1.48.0"
+  },
+  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
+}
