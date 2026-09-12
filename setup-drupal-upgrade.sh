@@ -261,6 +261,7 @@ check_solr() {
     ddev drush config:set "search_api.server.$server_id" backend_config.connector_config.host solr -y >/dev/null 2>&1 || true
     ddev drush config:set "search_api.server.$server_id" backend_config.connector_config.core dev -y >/dev/null 2>&1 || true
     ddev drush config:set "search_api.server.$server_id" backend_config.connector_config.port 8983 -y >/dev/null 2>&1 || true
+    ddev drush cr
     fixed_any=true
 
     if [ -n "$core" ]; then
