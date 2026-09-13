@@ -10,6 +10,7 @@ Portable ddev + Claude Code toolkit for auditing and executing a Drupal 10 → 1
 |---|---|---|
 | `setup-drupal-upgrade.sh` | (run from here, stays here) | Installer - copies everything else below into place |
 | `skills/d11-upgrade/SKILL.md` | `.claude/skills/d11-upgrade/SKILL.md` | Claude Code skill: the step-by-step upgrade execution plan |
+| `skills/d11-post-upgrade/SKILL.md` | `.claude/skills/d11-post-upgrade/SKILL.md` | Claude Code skill: fixes issues found by the post-upgrade smoke test (dblog/WSOD errors, visual regressions), run via `post-upgrade`'s `/d11-post-upgrade run` |
 | `pre-upgrade` | `.ddev/commands/host/pre-upgrade` | `ddev pre-upgrade` - audits the project and writes the reports the skill reads |
 | `pre-upgrade-scan.php` | `.ddev/commands/host/pre-upgrade-scan.php` | Helper invoked by `pre-upgrade` (module classification, custom code, removed-core-module scan) |
 | `ckeditor5-checklist-scan.php` | `.ddev/commands/host/ckeditor5-checklist-scan.php` | Helper invoked by `pre-upgrade` (CKEditor 4→5 detection + plugin compatibility) |

@@ -75,6 +75,9 @@ confirm() {
   esac
 }
 
+NODE_OK=false
+YARN_OK=false
+
 check_node() {
   local ver major
   if command -v node >/dev/null 2>&1; then
@@ -82,6 +85,7 @@ check_node() {
     major="${ver#v}"; major="${major%%.*}"
     if [ "$major" -ge 22 ] 2>/dev/null; then
       log "Node.js $ver found (>= 22 required) - OK"
+      NODE_OK=true
       return
     fi
     log "Node.js $ver found, but the nodejs-scrape/nodejs-diff toolkit needs >= 22."
@@ -91,39 +95,54 @@ check_node() {
 
   if confirm "Install Node.js 22 now?"; then
     if command -v brew >/dev/null 2>&1; then
-      brew install node@22 || fail "Failed to install Node.js via Homebrew."
+      brew install node@22 || true
       brew link --overwrite --force node@22 || true
     elif command -v nvm >/dev/null 2>&1; then
-      nvm install 22 && nvm use 22
+      nvm install 22 || true
+      nvm use 22 || true
     else
-      fail "No supported installer found (Homebrew or nvm). Install Node.js 22+ manually: https://nodejs.org/ then re-run this script."
+      warn "No supported installer found (Homebrew or nvm). Install Node.js 22+ manually: https://nodejs.org/ later if you want visual diffing."
     fi
-    command -v node >/dev/null 2>&1 || fail "Node.js install did not put 'node' on PATH. Open a new shell (or fix PATH) and re-run this script."
-    log "Node.js $(node -v) installed."
+    if command -v node >/dev/null 2>&1; then
+      ver="$(node -v)"; major="${ver#v}"; major="${major%%.*}"
+      if [ "$major" -ge 22 ] 2>/dev/null; then
+        log "Node.js $ver installed."
+        NODE_OK=true
+      else
+        warn "Node.js $ver is on PATH but is below the required 22 - nodejs-scrape/nodejs-diff won't work until it's upgraded."
+      fi
+    else
+      warn "Node.js install did not put 'node' on PATH - nodejs-scrape/nodejs-diff won't work until it does."
+    fi
   else
-    fail "Node.js 22+ is required for the nodejs-scrape/nodejs-diff toolkit. Install it and re-run this script."
+    warn "Skipping Node.js install - nodejs-scrape/nodejs-diff (visual diffing) won't be available until Node.js 22+ is installed. Continuing with the rest of the setup."
   fi
 }
 
 check_yarn() {
   if command -v yarn >/dev/null 2>&1; then
     log "yarn found ($(yarn -v)) - OK"
+    YARN_OK=true
     return
   fi
 
   log "yarn not found on PATH."
   if confirm "Install yarn now?"; then
     if command -v brew >/dev/null 2>&1; then
-      brew install yarn || fail "Failed to install yarn via Homebrew."
+      brew install yarn || true
     elif command -v npm >/dev/null 2>&1; then
-      npm install -g yarn || fail "Failed to install yarn via npm."
+      npm install -g yarn || true
     else
-      fail "No supported installer found (Homebrew or npm). Install yarn manually: https://yarnpkg.com/getting-started/install then re-run this script."
+      warn "No supported installer found (Homebrew or npm). Install yarn manually: https://yarnpkg.com/getting-started/install later if you want visual diffing."
     fi
-    command -v yarn >/dev/null 2>&1 || fail "yarn install did not put 'yarn' on PATH. Open a new shell (or fix PATH) and re-run this script."
-    log "yarn $(yarn -v) installed."
+    if command -v yarn >/dev/null 2>&1; then
+      log "yarn $(yarn -v) installed."
+      YARN_OK=true
+    else
+      warn "yarn install did not put 'yarn' on PATH - nodejs-scrape/nodejs-diff won't work until it does."
+    fi
   else
-    fail "yarn is required for the nodejs-scrape/nodejs-diff toolkit. Install it and re-run this script."
+    warn "Skipping yarn install - nodejs-scrape/nodejs-diff (visual diffing) won't be available until yarn is installed. Continuing with the rest of the setup."
   fi
 }
 
@@ -379,9 +398,13 @@ check_node
 check_yarn
 check_chrome_extension
 
-log "Installing nodejs toolkit dependencies (yarn install in .ddev/commands/host/nodejs) ..."
-( cd "$DDEV_HOST_DIR/nodejs" && yarn install ) || fail "yarn install failed in ${DDEV_HOST_DIR#"$PROJECT_ROOT"/}/nodejs"
-log "nodejs toolkit dependencies installed."
+if $NODE_OK && $YARN_OK; then
+  log "Installing nodejs toolkit dependencies (yarn install in .ddev/commands/host/nodejs) ..."
+  ( cd "$DDEV_HOST_DIR/nodejs" && yarn install ) || fail "yarn install failed in ${DDEV_HOST_DIR#"$PROJECT_ROOT"/}/nodejs"
+  log "nodejs toolkit dependencies installed."
+else
+  warn "Skipping nodejs toolkit dependency install (Node.js 22+ and/or yarn not available) - 'ddev nodejs-scrape'/'ddev nodejs-diff' (and the visual-diff step in pre-upgrade/post-upgrade) will be skipped until you install them and re-run this script."
+fi
 
 prompt_site_domain
 
