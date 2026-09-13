@@ -201,6 +201,7 @@ function extractRegion({ selectors, cssProps, skipTags }) {
   const skip = new Set(skipTags);
   const elements = [describeElement(el)];
   for (const descendant of el.querySelectorAll('*')) {
+    if (descendant.childElementCount === 0) continue; // leaf node, not a wrapper
     if (skip.has(descendant.tagName.toLowerCase())) continue;
     if (descendant.classList.contains('visually-hidden')) continue;
     if (isSliderRelated(descendant)) continue;

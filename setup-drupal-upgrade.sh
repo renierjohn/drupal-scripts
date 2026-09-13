@@ -197,6 +197,24 @@ PHP
   printf '%s\n' "$result"
 }
 
+solr_manual_setup_help() {
+  cat <<'EOS'
+
+Manual Solr setup:
+  1. Confirm the DDEV Solr add-on is installed: ddev get ddev/ddev-drupal-solr
+  2. (Re)start DDEV so Solr is up:              ddev restart
+  3. Confirm Solr is responding:                ddev exec -s solr curl -fsS http://localhost:8983/solr/
+  4. Point each search_api Solr server at DDEV's Solr service:
+       ddev drush config:set search_api.server.<SERVER_ID> backend_config.connector standard -y
+       ddev drush config:set search_api.server.<SERVER_ID> backend_config.connector_config.scheme http -y
+       ddev drush config:set search_api.server.<SERVER_ID> backend_config.connector_config.host solr -y
+       ddev drush config:set search_api.server.<SERVER_ID> backend_config.connector_config.port 8983 -y
+       ddev drush config:set search_api.server.<SERVER_ID> backend_config.connector_config.core <CORE_NAME> -y
+  5. Clear caches:                               ddev drush cr
+
+EOS
+}
+
 check_solr() {
   if ! grep -q '"drupal/search_api_solr"' composer.json 2>/dev/null; then
     log "Solr: drupal/search_api_solr not in composer.json - skipping Solr setup."
@@ -245,9 +263,11 @@ check_solr() {
     return
   fi
 
+  local parsed_any=false
   while IFS='|' read -r server_id status connector core; do
     [ -z "$server_id" ] && continue
     case "$status" in UP|DOWN) ;; *) continue ;; esac
+    parsed_any=true
     if [ "$status" = "UP" ]; then
       log "Solr server '$server_id' ($connector connector): connected."
       continue
@@ -274,21 +294,38 @@ check_solr() {
     fi
   done <<< "$solr_status"
 
+  if ! $parsed_any; then
+    warn "Unexpected error while checking Solr connectivity - could not parse drush's response:"
+    printf '%s\n' "$solr_status" | sed 's/^/    /' >&2
+    solr_manual_setup_help
+    warn "Please set up/verify Solr manually using the steps above, then re-run this script."
+    return
+  fi
+
   if $fixed_any; then
     log "Applied Solr fixes - restarting DDEV to apply them ..."
     ddev restart || fail "ddev restart failed while reconfiguring Solr."
     ddev drush cr >/dev/null 2>&1 || true
 
     solr_status="$(solr_check_php)"
+    local recheck_parsed_any=false
     while IFS='|' read -r server_id status connector core; do
       [ -z "$server_id" ] && continue
       case "$status" in UP|DOWN) ;; *) continue ;; esac
+      recheck_parsed_any=true
       if [ "$status" = "UP" ]; then
         log "Solr server '$server_id': now connected."
       else
         warn "Solr server '$server_id' is still not connected. Check 'ddev logs -s solr' and its connector settings (host/port/core) manually."
       fi
     done <<< "$solr_status"
+
+    if ! $recheck_parsed_any; then
+      warn "Unexpected error while re-checking Solr connectivity - could not parse drush's response:"
+      printf '%s\n' "$solr_status" | sed 's/^/    /' >&2
+      solr_manual_setup_help
+      warn "Please set up/verify Solr manually using the steps above."
+    fi
   fi
 }
 
