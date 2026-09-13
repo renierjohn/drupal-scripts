@@ -120,6 +120,23 @@ check_yarn() {
   fi
 }
 
+check_chrome_extension() {
+  log "Claude for Chrome lets Claude Code drive a real browser tab (useful for visual QA alongside nodejs-scrape/nodejs-diff)."
+  if confirm "Open the Chrome Web Store to install the Claude Chrome extension now?"; then
+    local url="https://chromewebstore.google.com/search/claude%20for%20chrome"
+    if command -v open >/dev/null 2>&1; then
+      open "$url" >/dev/null 2>&1 || warn "Could not open a browser automatically - visit: $url"
+    elif command -v xdg-open >/dev/null 2>&1; then
+      xdg-open "$url" >/dev/null 2>&1 || warn "Could not open a browser automatically - visit: $url"
+    else
+      warn "Could not detect a way to open a browser automatically - visit: $url"
+    fi
+    log "Search the Chrome Web Store for \"Claude for Chrome\" and click \"Add to Chrome\" (Chrome doesn't allow unattended/scripted installs)."
+  else
+    log "Skipping Chrome extension install - add it later from the Chrome Web Store if you want browser automation."
+  fi
+}
+
 prompt_site_domain() {
   local env_file="$DDEV_HOST_DIR/.env"
   local default_domain="" input tmp
@@ -353,6 +370,7 @@ install_file "$SOURCE_DIR/nodejs/.gitignore" "$DDEV_HOST_DIR/nodejs/.gitignore" 
 
 check_node
 check_yarn
+check_chrome_extension
 
 log "Installing nodejs toolkit dependencies (yarn install in .ddev/commands/host/nodejs) ..."
 ( cd "$DDEV_HOST_DIR/nodejs" && yarn install ) || fail "yarn install failed in ${DDEV_HOST_DIR#"$PROJECT_ROOT"/}/nodejs"
