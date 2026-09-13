@@ -50,6 +50,13 @@ fail() { printf '\033[1;31m!!\033[0m %s\n' "$1" >&2; exit 1; }
 
 [ -d "$SOURCE_DIR" ] || fail "Source directory not found: $SOURCE_DIR"
 
+CORE_LOCKED_VERSION="$(grep -A2 '"name": "drupal/core"' "$PROJECT_ROOT/composer.lock" 2>/dev/null | grep -m1 '"version"' | sed -E 's/.*"version": *"([^"]*)".*/\1/')"
+CORE_MAJOR="${CORE_LOCKED_VERSION#v}"; CORE_MAJOR="${CORE_MAJOR%%.*}"
+if [ -n "$CORE_MAJOR" ] && [ "$CORE_MAJOR" -ge 11 ] 2>/dev/null; then
+  log "drupal/core is already $CORE_LOCKED_VERSION (D11+) per composer.lock - nothing to set up for a D10->D11 upgrade. Not proceeding."
+  exit 0
+fi
+
 install_file() {
   local src="$1" dest="$2" mode="$3"
   [ -f "$src" ] || fail "Missing source file: $src"

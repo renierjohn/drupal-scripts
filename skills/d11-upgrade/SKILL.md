@@ -152,6 +152,34 @@ D11 bundles jQuery 4, which drops the deprecated jQuery API that jQuery 3 still 
 3. Treat the shim as a bridge, not a permanent fix: file/track follow-up work to actually rewrite the flagged custom JS to jQuery-4-native or vanilla-JS equivalents, since the shim module is a workaround for code that's still using a removed API, not a real fix.
 4. Re-check the site (same check as Phases 5-6) after enabling the shim, since restoring these functions can itself change behavior if custom JS relied on jQuery 3's specific (already-deprecated) semantics.
 
+## Final Step: Announce completion clearly
+
+`ddev run-upgrade` launches Claude Code interactively and does not exit when this skill finishes - the session stays open, so a clearly-marked banner is the only signal the user gets that the upgrade run is actually done. End every run (success or stop) with one, not a plain trailing sentence:
+
+On a clean verified site (Phase 5-6 succeeded):
+
+```
+================================
+ D11 UPGRADE COMPLETE
+================================
+- Modules/themes updated: <list, or "none needed">
+- Custom patches added: <list, or "none">
+- CKEditor migration: <done / not applicable>
+- WSOD fix attempts used: <N>/5
+- Next step: run `ddev post-upgrade` to smoke-test the upgraded site
+```
+
+On hitting the 5-attempt WSOD cap (Phase 5-6 did not resolve):
+
+```
+================================
+ D11 UPGRADE STOPPED - MANUAL REVIEW NEEDED
+================================
+- Current error: <exact watchdog/PHP error text>
+- Fixes already tried: <list + outcome of each>
+- Suggested next fix: <what you'd try next if authorized to continue>
+```
+
 ## Quick Reference
 
 | Phase | Source | Action |
@@ -166,6 +194,7 @@ D11 bundles jQuery 4, which drops the deprecated jQuery API that jQuery 3 still 
 | 5-6 | - | Check site; on WSOD, `watchdog:show`, targeted fix, recheck |
 | 7 | - | Max 5 fix attempts, then stop and report to the user |
 | 8 | Custom JS under `web/modules/custom`, `web/themes/custom` | Grep for deprecated jQuery API usage, install `drupal/jquery_deprecated_functions` as a bridge, track real rewrite separately |
+| Final | - | Print a clearly-marked `D11 UPGRADE COMPLETE` (or `STOPPED`) banner - the CLI session stays open otherwise |
 
 ## Common Mistakes
 

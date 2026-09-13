@@ -68,6 +68,33 @@ After each fix: `ddev nodejs-scrape post` -> `ddev nodejs-diff` -> re-open the s
 
 Still present after the re-check -> **stop**, don't keep iterating on that element. Log to `.ddev/commands/host/reports/post-upgrade-display-issue.md`: the page URL (for a quick manual look), region, xpath, and the `cssDiffs`/added/removed detail from the diff.
 
+## Final Step: Announce completion clearly
+
+`post-upgrade` execs into this skill via an interactive Claude Code session that does not exit when the skill finishes - the session stays open, so a clearly-marked banner is the only signal the user gets that the fix pass is actually done. End every run with one, not a plain trailing sentence:
+
+If every issue from both phases was resolved and re-verified (no entries in `post-upgrade-fix.md` or `post-upgrade-display-issue.md` from this run):
+
+```
+================================
+ D11 POST-UPGRADE FIXES COMPLETE
+================================
+- dblog/WSOD issues fixed: <list, or "none found">
+- Visual regressions fixed: <list, or "none found">
+- Remaining logged issues: none
+```
+
+If any issue hit its retry cap (1e/2e) and was logged instead of resolved:
+
+```
+================================
+ D11 POST-UPGRADE FIXES - ISSUES LOGGED FOR REVIEW
+================================
+- dblog/WSOD issues fixed: <list, or "none found">
+- Visual regressions fixed: <list, or "none found">
+- Logged for manual review: <list of issues, each with which report has the detail>
+- See: .ddev/commands/host/reports/post-upgrade-fix.md and/or post-upgrade-display-issue.md
+```
+
 ## Quick Reference
 
 | Step | Source | Action |
@@ -81,6 +108,7 @@ Still present after the re-check -> **stop**, don't keep iterating on that eleme
 | 2c | Confirmed real diffs | Fix in twig/CSS-Sass/module |
 | 2d | - | `nodejs-scrape post` -> `nodejs-diff` -> recheck |
 | 2e | - | Still changed after recheck -> log to `post-upgrade-display-issue.md` with page URL, don't keep iterating |
+| Final | - | Print a clearly-marked `D11 POST-UPGRADE FIXES COMPLETE` (or `- ISSUES LOGGED FOR REVIEW`) banner - the CLI session stays open otherwise |
 
 ## Common Mistakes
 
