@@ -1,6 +1,6 @@
 # Drupal 10 → 11 Upgrade Toolkit
 
-Portable ddev + Claude Code toolkit for auditing and executing a Drupal 10 → 11 upgrade. Copy this `drupal-scripts/` directory into any ddev-based Drupal 10 project and run the setup script to install it.
+ddev + Claude Code toolkit for auditing and executing a Drupal 10 → 11 upgrade. Copy this `drupal-scripts/` directory into any ddev-based Drupal 10 project and run the setup script to install it.
 
 📋 [Visual guide: file layout + run order](https://claude.ai/code/artifact/37c2fea0-12cd-402b-b365-4a5e58be642f?via=auto_preview&sk=HKQxiBIRpNAyU27w2xZUMw)
 
@@ -37,10 +37,14 @@ Skills live under `skills/`, one per subdirectory (`skills/d11-upgrade/SKILL.md`
 
 ## Usage
 
-1. Copy `drupal-scripts/` into the root of the target Drupal project (alongside `composer.json`, `.ddev/`, etc.).
+1. clone repo into the root of the target Drupal project (alongside `composer.json`, `.ddev/`, etc.).
 2. Install the toolkit:
    ```bash
    ./drupal-scripts/setup-drupal-upgrade.sh
+   ```
+   or
+   ```bash
+   bash drupal-scripts/setup-drupal-upgrade.sh
    ```
    This copies the skill and ddev commands into place, `chmod +x`s the executables, checks/installs Node.js 22+ and yarn (prompting first), `yarn install`s the `nodejs/` toolkit, prompts for the site's domain (saved as `BASE_URL` in `.ddev/commands/host/.env`), runs `ddev start`, then - if `drupal/search_api_solr` is in `composer.json` - checks whether DDEV's Solr service is installed and running and whether the site's `search_api` Solr server(s) can connect to it; if not, it installs the `ddev/ddev-drupal-solr` add-on (prompting first) and/or restarts DDEV as needed, and for any server using the local `standard` connector, points it at `host: solr, port: 8983` and aligns DDEV's `SOLR_CORENAME` with the server's configured core. Servers using a non-`standard` connector (e.g. `pantheon`) are left untouched. Safe to re-run any time you update `drupal-scripts/` - it overwrites the installed copies.
 3. Generate the audit reports:
@@ -49,10 +53,12 @@ Skills live under `skills/`, one per subdirectory (`skills/d11-upgrade/SKILL.md`
    ```
    Writes `pre-upgrade.md` and `ckeditor5-checklist.md` (plus raw scanner output) to `.ddev/commands/host/reports/`. Read `pre-upgrade.md` first - it flags any CRITICAL blocker (e.g. a module enabled in the DB with no code on disk) that will break later steps if left unresolved. It also installs/enables `drupal/stage_file_proxy` and points its origin at the `BASE_URL` saved in `.ddev/commands/host/.env` (see step 2 of setup) so local file requests fall back to the live site instead of 404ing, then runs `ddev nodejs-scrape pre` to capture a visual baseline (full XPath + computed CSS/layout snapshots of the header/footer/main-content regions for every page discovered via the homepage's main menu) before any code changes, writing `.ddev/commands/host/nodejs/output/pre.*.json`. After the upgrade, run `ddev nodejs-scrape post` and then `ddev nodejs-diff` to diff the two runs and flag any unintended visual/layout changes.
 4. Execute the upgrade:
+   ```bash
+   ddev run-upgrade
+   ```
    - **Guided (recommended):** `ddev run-upgrade` - opens an interactive Claude Code session pre-loaded with `/d11-upgrade run`. You approve each tool call as it runs; nothing executes unattended.
    - **Manual:** open `.claude/skills/d11-upgrade/SKILL.md` and work through its phases yourself, using the two reports as the source of truth for what needs upgrading.
-5. Re-run `ddev pre-upgrade` after major changes (composer updates, patches, module removals) to confirm the reports reflect the current state before continuing.
-6. Smoke-test the upgraded site:
+5. Smoke-test the upgraded site:
    ```bash
    ddev post-upgrade
    ```
