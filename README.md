@@ -2,6 +2,8 @@
 
 Portable ddev + Claude Code toolkit for auditing and executing a Drupal 10 → 11 upgrade. Copy this `drupal-scripts/` directory into any ddev-based Drupal 10 project and run the setup script to install it.
 
+📋 [Visual guide: file layout + run order](https://claude.ai/code/artifact/37c2fea0-12cd-402b-b365-4a5e58be642f?via=auto_preview&sk=HKQxiBIRpNAyU27w2xZUMw)
+
 ## What's in here
 
 | File | Installs to | Purpose |
