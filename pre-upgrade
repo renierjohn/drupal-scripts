@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-## Description: Drupal 10->11 pre-upgrade audit (Drush 13, upgrade_status scan, PHP/DB/module versions, CKEditor 4->5 checklist, stage_file_proxy setup, visual baseline capture) saved to .ddev/commands/host/reports/
+## Description: Drupal 10->11 pre-upgrade audit (Drush 13, upgrade_status scan, dblog enable, PHP/DB/module versions, CKEditor 4->5 checklist, stage_file_proxy setup, visual baseline capture) saved to .ddev/commands/host/reports/
 ## Usage: pre-upgrade
 ## Example: "ddev pre-upgrade"
 
@@ -44,7 +44,7 @@ fi
 ########################################
 # Step 1: Drush 13
 ########################################
-log "Step 1/8: Drush"
+log "Step 1/9: Drush"
 DRUSH_VENDOR="$PROJECT_ROOT/vendor/bin/drush"
 if [ ! -f "$DRUSH_VENDOR" ]; then
   log "Drush not found in vendor/. Installing drush/drush:^13 ..."
@@ -61,7 +61,7 @@ DRUSH_VERSION="$(ddev drush --version 2>/dev/null | tr -d '\r')"
 ########################################
 # Step 2: upgrade_status module
 ########################################
-log "Step 2/8: upgrade_status module"
+log "Step 2/9: upgrade_status module"
 if ! grep -q '"drupal/upgrade_status"' composer.json; then
   log "upgrade_status not in composer.json. Installing via ddev composer ..."
   ddev composer require drupal/upgrade_status --dev --no-interaction
@@ -80,9 +80,25 @@ if echo "$ENABLE_LOG" | grep -qiE "AssertionError|terminated abnormally|Drupal i
 fi
 
 ########################################
-# Step 3: version scan
+# Step 3: dblog module (Database Logging - watchdog log for capturing errors during upgrade)
 ########################################
-log "Step 3/8: scanning PHP / database / core / tooling versions"
+log "Step 3/9: dblog module"
+DBLOG_ENABLED=false
+if $BOOTSTRAP_OK; then
+  ddev drush en dblog -y >/dev/null 2>&1 && DBLOG_ENABLED=true
+  if $DBLOG_ENABLED; then
+    log "dblog enabled."
+  else
+    warn "Could not enable dblog via drush."
+  fi
+else
+  warn "Drupal bootstrap is broken - skipping dblog enable."
+fi
+
+########################################
+# Step 4: version scan
+########################################
+log "Step 4/9: scanning PHP / database / core / tooling versions"
 
 PHP_RUNTIME_VERSION="$(ddev exec php -r 'echo PHP_VERSION;' 2>/dev/null)"
 DB_SERVER_VERSION="$(ddev mysql --skip-ssl -N -e 'SELECT VERSION();' 2>/dev/null)"
@@ -105,18 +121,18 @@ if $BOOTSTRAP_OK; then
 fi
 
 ########################################
-# Step 4: module upgrade-path classification (composer.lock + active config, no bootstrap needed)
+# Step 5: module upgrade-path classification (composer.lock + active config, no bootstrap needed)
 ########################################
-log "Step 4/8: classifying module upgrade paths, listing custom modules/themes"
+log "Step 5/9: classifying module upgrade paths, listing custom modules/themes"
 MODULE_REPORT="$(ddev exec php "$SCAN_PHP" 2>&1)"
 
 ddev composer why-not drupal/core 11.0.0 --locked > "$RAW_WHY_NOT" 2>&1
 WHY_NOT_CONTRIB="$(grep -E '^drupal/' "$RAW_WHY_NOT" | grep -v '^drupal/core ' || true)"
 
 ########################################
-# Step 5: deprecated-syntax scan on custom code (mglaman/drupal-check)
+# Step 6: deprecated-syntax scan on custom code (mglaman/drupal-check)
 ########################################
-log "Step 5/8: scanning custom modules/themes for deprecated Drupal API usage"
+log "Step 6/9: scanning custom modules/themes for deprecated Drupal API usage"
 DRUPAL_CHECK_BIN="$PROJECT_ROOT/vendor/bin/drupal-check"
 if [ ! -f "$DRUPAL_CHECK_BIN" ]; then
   log "drupal-check not found in vendor/. Installing mglaman/drupal-check via ddev composer ..."
@@ -143,9 +159,9 @@ fi
 DRUPAL_CHECK_FINDINGS="$(grep -c ' Line ' "$RAW_DRUPAL_CHECK" 2>/dev/null || echo 0)"
 
 ########################################
-# Step 6: CKEditor 4 -> 5 migration checklist
+# Step 7: CKEditor 4 -> 5 migration checklist
 ########################################
-log "Step 6/8: checking CKEditor 4 usage and CKEditor5 plugin compatibility"
+log "Step 7/9: checking CKEditor 4 usage and CKEditor5 plugin compatibility"
 CKEDITOR_SCAN_OUTPUT="$(ddev exec php "$CKEDITOR_SCAN_PHP" 2>&1)"
 CKEDITOR_STATUS="$(echo "$CKEDITOR_SCAN_OUTPUT" | head -1)"
 CKEDITOR_BODY="$(echo "$CKEDITOR_SCAN_OUTPUT" | tail -n +2)"
@@ -167,9 +183,9 @@ else
 fi
 
 ########################################
-# Step 7: stage_file_proxy (proxy missing local files from BASE_URL in .env)
+# Step 8: stage_file_proxy (proxy missing local files from BASE_URL in .env)
 ########################################
-log "Step 7/8: installing/configuring stage_file_proxy"
+log "Step 8/9: installing/configuring stage_file_proxy"
 
 ENV_FILE="$PROJECT_ROOT/.ddev/commands/host/.env"
 STAGE_FILE_PROXY_ORIGIN=""
@@ -203,9 +219,9 @@ else
 fi
 
 ########################################
-# Step 8: capture pre-upgrade visual baseline (nodejs-scrape)
+# Step 9: capture pre-upgrade visual baseline (nodejs-scrape)
 ########################################
-log "Step 8/8: capturing pre-upgrade visual baseline (ddev nodejs-scrape pre)"
+log "Step 9/9: capturing pre-upgrade visual baseline (ddev nodejs-scrape pre)"
 
 NODEJS_SCRAPE_CMD="$PROJECT_ROOT/.ddev/commands/host/nodejs-scrape"
 NODEJS_SCRAPE_RAN=false
@@ -250,7 +266,7 @@ log "Writing report to .ddev/commands/host/reports/pre-upgrade.md"
   else
     echo "- Enabled: **FAILED - Drupal bootstrap is broken**"
     echo "- Error: \`$BOOTSTRAP_ERROR\`"
-    echo "- This blocks \`drush upgrade_status:analyze\` and most other drush commands that require a full bootstrap. See the orphan module list in section 4 - this is almost certainly the cause. Fix that first, then re-run \`ddev pre-upgrade\`."
+    echo "- This blocks \`drush upgrade_status:analyze\` and most other drush commands that require a full bootstrap. See the orphan module list in section 5 - this is almost certainly the cause. Fix that first, then re-run \`ddev pre-upgrade\`."
   fi
   if $UPGRADE_STATUS_RAN; then
     echo "- Full scan output: \`.ddev/commands/host/reports/pre-upgrade-upgrade-status-raw.txt\`"
@@ -260,7 +276,19 @@ log "Writing report to .ddev/commands/host/reports/pre-upgrade.md"
     echo "- Fatal error: \`$UPGRADE_STATUS_FATAL\`"
   fi
   echo
-  echo "## 3. Environment / tooling versions"
+  echo "## 3. dblog module"
+  echo
+  if $BOOTSTRAP_OK; then
+    if $DBLOG_ENABLED; then
+      echo "- Enabled: yes"
+    else
+      echo "- Enabled: **no** (see warnings above)"
+    fi
+  else
+    echo "- Enabled: **skipped - Drupal bootstrap is broken**"
+  fi
+  echo
+  echo "## 4. Environment / tooling versions"
   echo
   echo "| Component | Detected | D11 requirement | Status |"
   echo "|---|---|---|---|"
@@ -276,7 +304,7 @@ log "Writing report to .ddev/commands/host/reports/pre-upgrade.md"
     echo "**Note:** the \`mysql\`/\`mariadb\` CLI in the web container may negotiate TLS by default against an older DB server and fail with \`TLS/SSL error\`. Use \`ddev mysql --skip-ssl\` (or add \`--skip-ssl\` to any raw \`mysql\`/\`drush sql:query\` call) when the server is still on MariaDB 10.4."
     echo
   fi
-  echo "## 4. Module upgrade paths"
+  echo "## 5. Module upgrade paths"
   echo
   echo "$MODULE_REPORT"
   echo "### Composer-level blockers (\`composer why-not drupal/core 11.0.0\`)"
@@ -291,7 +319,7 @@ log "Writing report to .ddev/commands/host/reports/pre-upgrade.md"
     echo "_No contrib package directly blocks drupal/core 11.0.0 per \`composer.lock\`._"
   fi
   echo
-  echo "## 5. Deprecated syntax scan on custom code (mglaman/drupal-check)"
+  echo "## 6. Deprecated syntax scan on custom code (mglaman/drupal-check)"
   echo
   echo "- Action: $DRUPAL_CHECK_ACTION"
   if [ "${#DRUPAL_CHECK_TARGETS[@]}" -gt 0 ]; then
@@ -309,7 +337,7 @@ log "Writing report to .ddev/commands/host/reports/pre-upgrade.md"
     fi
   fi
   echo
-  echo "## 6. CKEditor 4 -> 5 migration checklist"
+  echo "## 7. CKEditor 4 -> 5 migration checklist"
   echo
   if [ "$CKEDITOR_STATUS" = "CKEDITOR4: no" ]; then
     echo "- CKEditor 4 in use: no - nothing to migrate."
@@ -320,7 +348,7 @@ log "Writing report to .ddev/commands/host/reports/pre-upgrade.md"
   fi
   echo "- Full checklist: \`.ddev/commands/host/reports/ckeditor5-checklist.md\`"
   echo
-  echo "## 7. stage_file_proxy"
+  echo "## 8. stage_file_proxy"
   echo
   echo "- Action: $STAGE_FILE_PROXY_ACTION"
   if $STAGE_FILE_PROXY_ENABLED; then
@@ -336,7 +364,7 @@ log "Writing report to .ddev/commands/host/reports/pre-upgrade.md"
     echo "- Origin: **not set** - no \`BASE_URL\` in \`.ddev/commands/host/.env\`. Run \`./drupal-scripts/setup-drupal-upgrade.sh\` to be prompted for the site domain, then re-run \`ddev pre-upgrade\`."
   fi
   echo
-  echo "## 8. Visual baseline (nodejs-scrape)"
+  echo "## 9. Visual baseline (nodejs-scrape)"
   echo
   echo "- $NODEJS_SCRAPE_STATUS"
   if $NODEJS_SCRAPE_RAN; then
